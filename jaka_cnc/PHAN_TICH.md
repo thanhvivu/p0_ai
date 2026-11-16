@@ -76,7 +76,7 @@ Những thứ còn thiếu cho CNC3..CNC6:
 | 1 | Bộ điểm dạy riêng cho CNC3..CNC6 (Load/Unload/Wait/End/Down) | Lệch vài mm là đâm vào chuck |
 | 2 | Điểm thổi khí (AirC1v1, AirSwitchTool, AirC2v1, AirC2) nằm ở từng máy CNC | Cũng phải theo từng máy |
 | 3 | Home (DI90) chỉ so sánh với điểm CNC1/CNC2 và lùi theo điểm CNC1/CNC2 | Khi đang ở CNC3..6 mà bấm Home, robot có thể MoveL tới điểm của CNC1 |
-| 4 | Tín hiệu kẹp chuck: map chỉ có **DO79/DI79 = chuck CNC1**, **DO78/DI78 = chuck CNC2** | Phía PLC phải định tuyến theo AO2 (process) cho CNC3..6, hoặc cần thêm tín hiệu |
+| 4 | Tín hiệu kẹp chuck: map chỉ có **DO79/DI79 = chuck CNC1**, **DO78/DI78 = chuck CNC2** | **Đã xác nhận:** tín hiệu dùng chung, PLC chọn máy kẹp theo Process đang chạy → robot không cần sửa |
 | 5 | Không có kiểm tra trục Axis1 đã đúng vị trí cặp máy | Nếu PLC gửi sai, robot đi vào sai máy |
 
 ## 4. Đánh giá bản của Gemini (`jamaguchi_updated.txt`)
@@ -125,7 +125,7 @@ Mọi chỗ sửa đều có nhãn `[CNC36]`.
    Các mảng cũ vẫn được khai báo nhưng không còn dùng.
 7. **Cảnh báo AI16** (chỉ ghi log, không chặn): khi chạy Case, nếu AI16 không thuộc cặp
    máy của Process hiện tại thì log `WARNING AI16 ... CHECK AXIS1 POSITION`.
-8. **Chú thích tại DO79/DI79 và DO78/DI78** về việc PLC phải định tuyến tín hiệu kẹp chuck cho CNC3..6.
+8. **Chú thích tại DO79/DI79 và DO78/DI78**: tín hiệu kẹp chuck dùng chung cho P2/P3/P4, PLC chọn máy theo Process (đã xác nhận).
 
 9. **Cửa theo cặp máy**: lúc vào Process, lúc thoát DI16, và trong Home (nhận diện điểm cửa
    + các lệnh đi về cửa "giữ J6 hiện tại") đều dùng `p_odd_door`/`p_even_door`.
@@ -148,12 +148,13 @@ chung được khi các cặp máy bố trí giống nhau — nếu cửa CNC3..
 
 Đã xác nhận (2026-11): điểm CNC2 mới teach là đúng; CNC5 đối diện CNC6, 1/3/5 cùng hàng và
 quay mặt về 2/4/6; chuyển động cặp 3/4 và 5/6 làm giống cặp 1/2; điểm CNC3..6 và cửa
-tạm lấy theo cặp 1/2. Còn chờ kiểm tra: mục 1, 2 dưới đây; mục 3 giữ nguyên hiện trạng.
+tạm lấy theo cặp 1/2. Tín hiệu kẹp chuck: dùng chung, PLC chọn máy theo Process (mục 1 đã xong). Còn chờ kiểm tra: mục 2; mục 3 giữ nguyên hiện trạng.
 Ghi chú mục "vị trí trục khi chạy P1/P5–P8": dự kiến robot về điểm trung gian/Home rồi trục mới
 về vị trí cặp 1/2 — hiện code chưa thêm gì cho việc này (P2/P3/P4 thoát vẫn dừng ở cửa).
 
 
-1. **Kẹp chuck CNC3..CNC6**: DO79/DI79 (lẻ) và DO78/DI78 (chẵn) có được PLC định tuyến
+1. ~~Kẹp chuck CNC3..CNC6~~ — **đã xác nhận**: DO79/DI79 (lẻ), DO78/DI78 (chẵn) dùng chung; PLC chọn máy theo Process.
+   (nội dung cũ) **Kẹp chuck CNC3..CNC6**: DO79/DI79 (lẻ) và DO78/DI78 (chẵn) có được PLC định tuyến
    theo AO2 (P3 → CNC3/CNC4, P4 → CNC5/CNC6) không? Nếu không, cần thêm tín hiệu mới trong map
    và sửa 2 chỗ có nhãn `[CNC36]`, mỗi P dùng chỉ số IO literal riêng.
 2. **AI16** chứa **số CNC (1..6)** hay **số vị trí trục Axis1 (1 = CNC12, 2 = CNC34, 3 = CNC56)**?

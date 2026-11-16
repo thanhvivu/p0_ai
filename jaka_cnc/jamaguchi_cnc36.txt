@@ -2458,8 +2458,8 @@ while(1):
                                         log_message(1,"P2C1 C1LOADEND COMPLETE")
 
                                         if(case_motion_ok == 1):
-                                            # [CNC36] DO79/DI79 = Clamp Chuck CNC1 in the IO map. For P3/P4 the PLC must route this
-                                            # request to CNC3/CNC5 (e.g. by AO2 process number). Confirm with PLC before running.
+                                            # [CNC36] DO79/DI79 = Clamp Chuck of the odd CNC, shared by P2/P3/P4 (confirmed 2026-11):
+                                            # the PLC clamps CNC1, CNC3 or CNC5 according to the active Process.
                                             set_digital_output(4,78,1,1)
                                             log_message(1,"P2C1 AT C1LOADEND DO79 ON WAIT DI79 ON CLAMP")
                                             wait_input(4,78,1,0)
@@ -2632,8 +2632,8 @@ while(1):
                                                 home_route_hint = 2
                                                 log_message(1,"P2C3 ENDLOADM2V1 COMPLETE")
 
-                                                # [CNC36] DO78/DI78 = Clamp Chuck CNC2 in the IO map. For P3/P4 the PLC must route this
-                                                # request to CNC4/CNC6 (e.g. by AO2 process number). Confirm with PLC before running.
+                                                # [CNC36] DO78/DI78 = Clamp Chuck of the even CNC, shared by P2/P3/P4 (confirmed 2026-11):
+                                                # the PLC clamps CNC2, CNC4 or CNC6 according to the active Process.
                                                 set_digital_output(4,77,1,1)
                                                 log_message(1,"P2C3 AT ENDLOADM2V1 DO78 ON WAIT DI78 ON")
                                                 di78 = get_digital_input(4,77)
