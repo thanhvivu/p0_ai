@@ -192,3 +192,15 @@ Mọi bước chờ tín hiệu PLC được thay bằng `sleep` + log `SIM SKIP
 
 Sau khi teach điểm CNC3..6 vào `jamaguchi_cnc36.txt`, sinh lại 2 file này
 (`python tao_sim.py ../jamaguchi_cnc36.txt .`) rồi chạy lại để kiểm tra điểm mới trong Simulation trước khi lên máy thật.
+
+## 9. Chu trình sản phẩm thực tế (đã xác nhận 2026-11)
+
+* CNC1/3/5 = **công đoạn 1**, CNC2/4/6 = **công đoạn 2**. Cặp 3/4 và 5/6 chạy giống cặp 1/2; trục Axis1 đưa robot giữa các cặp.
+* Chu trình hiện tại (thứ tự do PLC gọi):
+  1. **P1** lấy phôi thô bằng Tool Load (DI28).
+  2. **Unload CNC lẻ** bằng Tool Unload → **Load CNC lẻ** bằng Tool Load (P2/P3/P4 Case2 → Case1).
+  3. **P8** đổi tool: chuyển sản phẩm từ Tool Unload sang Tool Load.
+  4. **Unload CNC chẵn** → **Load CNC chẵn** (Case4 → Case3).
+  5. **P7** đặt thành phẩm vào cụm kiểm tra.
+* **P5 (xì khí) và P6 (Bavia) hiện đang bị bỏ qua** phía PLC (không bật DI22/DI23). Code robot giữ nguyên, không cần sửa.
+* AI16 = số CNC 1..6 (đã xác nhận) – đúng với giả định trong code.
