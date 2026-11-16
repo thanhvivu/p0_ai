@@ -451,22 +451,22 @@ while(sim_t > 0):
     end
     if(sim_t == 15):
         sim_ai16 = 3
-        log_message(1,"SIM TEST 15 EXPECT MATCH C1LOAD (pair CNC3 CNC4) AI16 3")
+        log_message(1,"SIM TEST 15 EXPECT MATCH C1LOAD PAIR CNC3 CNC4 AI16 3")
         movj(p_c3_load,0,speed_movej_fast,720,0)
     end
     if(sim_t == 16):
         sim_ai16 = 4
-        log_message(1,"SIM TEST 16 EXPECT MATCH ENDLOADM2V1 (pair CNC3 CNC4) AI16 4")
+        log_message(1,"SIM TEST 16 EXPECT MATCH ENDLOADM2V1 PAIR CNC3 CNC4 AI16 4")
         movj(p_c4_load_end,0,speed_movej_fast,720,0)
     end
     if(sim_t == 17):
         sim_ai16 = 5
-        log_message(1,"SIM TEST 17 EXPECT MATCH C1UNLOAD (pair CNC5 CNC6) AI16 5")
+        log_message(1,"SIM TEST 17 EXPECT MATCH C1UNLOAD PAIR CNC5 CNC6 AI16 5")
         movj(p_c5_unload,0,speed_movej_fast,720,0)
     end
     if(sim_t == 18):
         sim_ai16 = 6
-        log_message(1,"SIM TEST 18 EXPECT MATCH UNLOADM2_WAIT (pair CNC5 CNC6) AI16 6")
+        log_message(1,"SIM TEST 18 EXPECT MATCH UNLOADM2_WAIT PAIR CNC5 CNC6 AI16 6")
         movj(p_c6_unload_wait,0,speed_movej_fast,720,0)
     end
     home_actual_joint = get_atl_joint_pose()

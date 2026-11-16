@@ -101,8 +101,8 @@ tests=[('p_c1_load_end',1,'C1LOADEND'),('p_c1_load',1,'C1LOAD'),('p_c1_load_wait
 ('p_end_load_m2v1',2,'ENDLOADM2V1'),('p_load_c2',2,'LOADC2'),('p_load_m2_wait',2,'LOADM2_WAIT'),
 ('p_unload_m2',2,'UNLOADM2'),('p_unload_m2_wait',2,'UNLOADM2_WAIT'),('p_air_c2',2,'AIRC2'),
 ('p_door_c1',1,'DOORC1'),('p_door_c2',2,'DOORC2'),
-('p_c3_load',3,'C1LOAD (pair CNC3 CNC4)'),('p_c4_load_end',4,'ENDLOADM2V1 (pair CNC3 CNC4)'),
-('p_c5_unload',5,'C1UNLOAD (pair CNC5 CNC6)'),('p_c6_unload_wait',6,'UNLOADM2_WAIT (pair CNC5 CNC6)')]
+('p_c3_load',3,'C1LOAD PAIR CNC3 CNC4'),('p_c4_load_end',4,'ENDLOADM2V1 PAIR CNC3 CNC4'),
+('p_c5_unload',5,'C1UNLOAD PAIR CNC5 CNC6'),('p_c6_unload_wait',6,'UNLOADM2_WAIT PAIR CNC5 CNC6')]
 h=WARN+['# SIM TEST 2: DI90 Home recovery from each taught point.',
 '# For each test: MoveJ HomeLocation -> MoveJ straight to the test point (simulation only:',
 '# no obstacle check) -> run the unchanged DI90 Home block with AI16 = sim_ai16.',
@@ -121,6 +121,7 @@ for k in range(1,len(tests)):
 h+=['    sim_t = sim_next','end','log_message(1,"SIM HOME TEST END")','']
 
 for name,txt in [('sim_test1_motion.txt',m),('sim_test2_home.txt',h)]:
+    assert not any(re.search(r'"[^"]*[()][^"]*"',x) for x in txt), 'parentheses inside a string: JAKA parser rejects them'
     assert sum(dd(x) for x in txt)==0, name
     d=0
     for x in txt:
