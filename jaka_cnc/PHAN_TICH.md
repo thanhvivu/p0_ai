@@ -205,3 +205,13 @@ Sau khi teach điểm CNC3..6 vào `jamaguchi_cnc36.txt`, sinh lại 2 file này
   5. **P7** đặt thành phẩm vào cụm kiểm tra.
 * **P5 (xì khí) và P6 (Bavia) hiện đang bị bỏ qua** phía PLC (không bật DI22/DI23). Code robot giữ nguyên, không cần sửa.
 * AI16 = số CNC 1..6 (đã xác nhận) – đúng với giả định trong code.
+
+## 10. Kết quả chạy Simulation (2026-11-16, log xuất từ JAKA)
+
+* **Test 1 (chuyển động)**: chạy trọn 4 lần liên tiếp (chế độ lặp đang bật), mỗi lần 332 dòng log,
+  đủ 12 Case kết thúc đúng (`... END AT ...`), đủ `ACTIVE POINT SET CNC1 CNC2 / CNC3 CNC4 / CNC5 CNC6`. Không lỗi.
+* **Test 2 (Home DI90)**: 18/18 phép thử nhận diện đúng điểm, đúng bộ điểm theo AI16, đúng cửa
+  (CNC lẻ → DoorC1, CNC chẵn → DoorC2), cả 18 lần đều về HomeLocation và bật DO16. Không lỗi.
+* 2 lỗi `Parsing failed` trong log (22:36:29 và 23:21:24) là lỗi của file test (gán `di64 = 1`,
+  dấu ngoặc trong chuỗi log), đã sửa; chương trình chính không có 2 mẫu này.
+* Rút ra: JAKA chỉ báo lỗi cú pháp khi **chạy tới dòng đó**, nên nạp được chưa chứng minh cả file đúng.
