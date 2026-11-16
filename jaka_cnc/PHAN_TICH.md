@@ -87,10 +87,9 @@ gán lại theo P2/P3/P4, và sửa phần chuyển động 29..32 để dùng b
 
 **Các lỗi / thiếu sót:**
 
-1. **Đã đổi giá trị điểm dạy CNC2 đang chạy tốt** (`p_load_m2_wait`, `p_load_c2`,
-   `p_end_load_m2v1`), còn giá trị cũ của CNC2 lại được chép sang CNC4/CNC6.
-   Không rõ là bạn mới dạy lại CNC2 hay đây là điểm dạy của CNC4 bị đặt nhầm chỗ.
-   → **Cần bạn xác nhận.**
+1. Đổi giá trị 3 điểm CNC2 (`p_load_m2_wait`, `p_load_c2`, `p_end_load_m2v1`).
+   **Đã xác nhận: đây là điểm CNC2 vừa teach lại** → bản bổ sung đã cập nhật theo giá trị này.
+   Nhưng Gemini lại chép giá trị CNC2 *cũ* sang CNC4/CNC6; bản bổ sung chép giá trị *mới*.
 2. Vì đổi điểm CNC2 mà **không cập nhật mảng min/max**, J4 của cả 3 điểm mới
    (162.6–162.9°) **nằm ngoài khoảng ±5°** (165.8–176.0°). Khi bấm Home lúc robot đang ở
    LoadWait/LoadC2/EndLoadM2v1 của CNC2, robot không nhận ra điểm và chuyển sang nhánh
@@ -106,12 +105,17 @@ gán lại theo P2/P3/P4, và sửa phần chuyển động 29..32 để dùng b
 
 Mọi chỗ sửa đều có nhãn `[CNC36]`.
 
-1. **Giữ nguyên điểm CNC1/CNC2 của code gốc.**
+1. **Giữ điểm CNC1 của code gốc; cập nhật 3 điểm CNC2 vừa teach lại**
+   (`p_load_m2_wait`, `p_load_c2`, `p_end_load_m2v1`).
 2. **Thêm offset** `p_c3..p_c6_user_x_offset` (tinh chỉnh giống CNC1/CNC2).
-3. **Thêm bộ điểm CNC3..CNC6** gồm cả điểm thổi khí. Hiện là **PLACEHOLDER = bản sao CNC1/CNC2**, mỗi điểm có ghi chú nguồn.
+3. **Thêm bộ điểm CNC3..CNC6** gồm điểm thổi khí và **điểm cửa `p_door_c3..p_door_c6`**.
+   Hiện là **PLACEHOLDER**: CNC3/CNC5 = bản sao CNC1, CNC4/CNC6 = bản sao CNC2 (bản CNC2 mới).
+   Mỗi điểm có dòng ghi chú nguồn ngay phía trên.
 4. **Biến `cnc_pair`** (1 = CNC1/2, 2 = CNC3/4, 3 = CNC5/6) và khối gán bộ điểm active
-   `p_odd_*`/`p_even_*` (17 biến, kể cả điểm thổi khí và offset).
-   * Khi thực thi Case: P2 → 1, P3 → 2, P4 → 3, rồi gán bộ điểm.
+   `p_odd_*`/`p_even_*` (19 biến: cửa, offset, điểm thổi khí, Load/Unload).
+   * Khi vào Process (trước khi MoveJ tới cửa): P2 → 1, P3 → 2, P4 → 3, rồi gán bộ điểm.
+     Nhờ vậy cửa lúc vào và lúc thoát DI16 là cửa của đúng cặp máy.
+   * Khi thực thi Case: gán lại lần nữa (an toàn khi nạp lại chương trình giữa chừng).
    * Khi Home DI90: chọn `cnc_pair` theo **AI16** (1–2 / 3–4 / 5–6). Nếu AI16 không hợp lệ thì giữ cặp của Case gần nhất.
 5. **Chuyển động Case 29..32**: dùng `p_odd_*`/`p_even_*` cho mọi điểm, kể cả điểm thổi khí.
 6. **Home DI90**: nhận diện và lùi theo bộ điểm active. Phép kiểm tra joint ±5° nay
@@ -123,14 +127,30 @@ Mọi chỗ sửa đều có nhãn `[CNC36]`.
    máy của Process hiện tại thì log `WARNING AI16 ... CHECK AXIS1 POSITION`.
 8. **Chú thích tại DO79/DI79 và DO78/DI78** về việc PLC phải định tuyến tín hiệu kẹp chuck cho CNC3..6.
 
-Không thay đổi: P1, P5–P8, logic DI16/DI17, chọn Process, chọn cửa DI83/DI84, điểm Door
-(dùng chung, vì là tư thế robot trong lối đi so với base), vùng nguy hiểm theo TCP
-(tính theo base robot nên dùng chung được khi các cặp máy bố trí giống nhau), `p_end_load_m2v2`.
+9. **Cửa theo cặp máy**: lúc vào Process, lúc thoát DI16, và trong Home (nhận diện điểm cửa
+   + các lệnh đi về cửa "giữ J6 hiện tại") đều dùng `p_odd_door`/`p_even_door`.
+   Trong Home, J1..J5 của cửa trước đây là số viết cứng (`-126.687`, `82.806`...) nay đọc từ
+   `p_odd_door[i]` / `p_even_door[i]`. **Code gốc chưa từng dùng phép gán dạng `a[i] = b[i]`**,
+   nên khi nạp chương trình lần đầu cần kiểm tra bộ điều khiển chấp nhận, và chạy thử DI90 một lần
+   ở tốc độ thấp. Nếu bị báo lỗi, báo lại để chuyển sang dạng số viết cứng theo từng cặp.
+
+Không thay đổi: P1, P5–P8, logic DI16/DI17, chọn Process, chọn cửa DI83/DI84,
+trình tự chuyển động (đã xác nhận cặp 3/4, 5/6 chạy cùng kiểu với cặp 1/2),
+vùng nguy hiểm theo TCP (ranh giới X vẫn lấy theo DoorC1/DoorC2; tính theo base robot nên dùng
+chung được khi các cặp máy bố trí giống nhau — nếu cửa CNC3..6 sau khi teach lệch nhiều, cần đo lại),
+`p_end_load_m2v2`, hành vi P2/P3/P4 thoát ở cửa không về Home.
 
 > Lưu ý: tôi đã kiểm tra cân bằng `if/while … end` và rà toàn bộ diff,
 > nhưng **chưa chạy trên bộ điều khiển JAKA thật**. Phải nạp thử và test theo mục 7.
 
 ## 6. Việc cần làm phía PLC / cần xác nhận
+
+Đã xác nhận (2026-11): điểm CNC2 mới teach là đúng; CNC5 đối diện CNC6, 1/3/5 cùng hàng và
+quay mặt về 2/4/6; chuyển động cặp 3/4 và 5/6 làm giống cặp 1/2; điểm CNC3..6 và cửa
+tạm lấy theo cặp 1/2. Còn chờ kiểm tra: mục 1, 2 dưới đây; mục 3 giữ nguyên hiện trạng.
+Ghi chú mục "vị trí trục khi chạy P1/P5–P8": dự kiến robot về điểm trung gian/Home rồi trục mới
+về vị trí cặp 1/2 — hiện code chưa thêm gì cho việc này (P2/P3/P4 thoát vẫn dừng ở cửa).
+
 
 1. **Kẹp chuck CNC3..CNC6**: DO79/DI79 (lẻ) và DO78/DI78 (chẵn) có được PLC định tuyến
    theo AO2 (P3 → CNC3/CNC4, P4 → CNC5/CNC6) không? Nếu không, cần thêm tín hiệu mới trong map
@@ -144,7 +164,7 @@ Không thay đổi: P1, P5–P8, logic DI16/DI17, chọn Process, chọn cửa D
 
 ## 7. Quy trình chạy thử (đề xuất)
 
-1. Đưa trục tới `Pos CNC34`. Dạy lại các điểm theo **đúng thứ tự** CNC3: `p_c3_air_v1`, `p_c3_air_switch_tool`,
+1. Đưa trục tới `Pos CNC34`. Teach cửa `p_door_c3`, `p_door_c4`. Dạy lại các điểm theo **đúng thứ tự** CNC3: `p_c3_air_v1`, `p_c3_air_switch_tool`,
    `p_c3_load_wait`, `p_c3_load`, `p_c3_load_end`, `p_c3_unload_wait`, `p_c3_unload`,
    `p_c3_unload_down`. Với CNC4: `p_c4_air_v1`, `p_c4_air`, `p_c4_load_wait`, `p_c4_load`,
    `p_c4_load_end`, `p_c4_unload_wait`, `p_c4_unload`. Dán giá trị joint vào file.
@@ -154,4 +174,5 @@ Không thay đổi: P1, P5–P8, logic DI16/DI17, chọn Process, chọn cửa D
    UnloadWait, Unload, UnloadDown, AirC4). Log phải báo `HOME ACTUAL POSITION MATCH ...`
    và robot phải lùi đúng đường.
 4. **Chạy lại toàn bộ test của CNC1/CNC2** (regression), vì phần Home đã đổi cách kiểm tra ±5°.
-5. Lặp lại cho `Pos CNC56` (P4, DI40..43, `p_c5_*`, `p_c6_*`).
+5. Lặp lại cho `Pos CNC56` (P4, DI40..43, `p_door_c5`, `p_door_c6`, `p_c5_*`, `p_c6_*`).
+6. Lần nạp đầu: chạy DI90 Home một lần ở tốc độ thấp để xác nhận lệnh `door_c1_keep_j6_joint[i] = p_odd_door[i]` được bộ điều khiển chấp nhận.

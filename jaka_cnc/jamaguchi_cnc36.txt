@@ -1,6 +1,7 @@
 # [CNC36] 2026-11: extended for CNC3..CNC6 (P3 = CNC3/CNC4, P4 = CNC5/CNC6).
 #   Search "[CNC36]" for every change. Motion code is shared; only the point set changes.
-#   CNC3..CNC6 points are PLACEHOLDER copies of CNC1/CNC2 and must be re-taught.
+#   CNC3..CNC6 points (incl. Door) are PLACEHOLDER copies of CNC1/CNC2 and must be re-taught.
+#   Home keep-J6 Door moves read J1..J5 from p_odd_door/p_even_door (verify on first load).
 #
 # FULL PROCESS 1-10 - EMBEDDED IO MODBUS
 # Source: MapRobotCobot.xlsx (Desktop, 2026-09-04)
@@ -125,12 +126,12 @@ p_c1_unload = [-133.563,140.802,37.750,182.372,-270.839,-134.961]
 # C1UnloadDown - retreat point after DI64 clamp confirmation
 p_c1_unload_down = [-133.561,140.586,38.163,182.176,-270.837,-134.961]
 
-# Process 2 Case 3 - Load CNC2 (model 2 taught positions)
-p_load_m2_wait = [50.293,126.775,63.817,171.018,-264.506,44.650]
+# Process 2 Case 3 - Load CNC2 (model 2 taught positions) - [CNC36] LoadM2_Wait/LoadC2/EndLoadM2v1 re-taught 2026-11
+p_load_m2_wait = [50.297,126.088,68.080,162.942,-264.499,44.244]
 # LoadC2: release Tool Load before entering EndLoadM2v1
-p_load_c2 = [56.589,126.376,64.481,170.780,-258.211,44.831]
+p_load_c2 = [56.457,125.684,68.753,162.625,-258.346,43.927]
 # EndLoadM2v1 - updated from the latest taught position.
-p_end_load_m2v1 = [56.678,126.378,64.477,170.783,-258.123,44.833]
+p_end_load_m2v1 = [56.822,125.691,68.739,162.628,-257.982,43.908]
 p_end_load_m2v2 = [57.088,126.289,65.170,169.400,-256.938,44.672]
 # EndLoadM2v1/v2 are retained for Home recognition only while Case 3 is simplified.
 # Relative Cartesian retreat after loading even-numbered CNC: X -20 mm in user frame
@@ -145,6 +146,17 @@ p_unload_m2 = [57.266,126.106,64.997,170.375,-256.483,-135.334]
 # position in front of every pair, the CNC1/CNC2 values could be reused unchanged.
 # !!! PLACEHOLDER: every value below is a COPY of CNC1 (odd side) or CNC2 (even side). !!!
 # !!! Re-teach / verify each point on the real machine before running at normal speed. !!!
+# Door points (robot posture in the aisle in front of each CNC pair) - PLACEHOLDER
+# DoorC3/DoorC5 copy DoorC1 (odd side), DoorC4/DoorC6 copy DoorC2 (even side).
+# copy of p_door_c1
+p_door_c3 = [-126.687,83.807,112.098,163.645,-261.426,-44.917]
+# copy of p_door_c2
+p_door_c4 = [82.806,67.797,128.293,165.476,-230.174,-49.001]
+# copy of p_door_c1
+p_door_c5 = [-126.687,83.807,112.098,163.645,-261.426,-44.917]
+# copy of p_door_c2
+p_door_c6 = [82.806,67.797,128.293,165.476,-230.174,-49.001]
+
 # CNC3 (P3 Case1/Case2, odd side like CNC1) - PLACEHOLDER
 # copy of p_air_c1v1
 p_c3_air_v1 = [-134.312, 136.943, 45.580, 177.004, -269.190, -44.856]
@@ -169,11 +181,11 @@ p_c4_air_v1 = [56.198,122.439,71.850,164.637,-257.503,-47.180]
 # copy of p_air_c2
 p_c4_air = [55.659,126.993,65.379,166.557,-258.042,-47.170]
 # copy of p_load_m2_wait
-p_c4_load_wait = [50.293,126.775,63.817,171.018,-264.506,44.650]
+p_c4_load_wait = [50.297,126.088,68.080,162.942,-264.499,44.244]
 # copy of p_load_c2
-p_c4_load = [56.589,126.376,64.481,170.780,-258.211,44.831]
+p_c4_load = [56.457,125.684,68.753,162.625,-258.346,43.927]
 # copy of p_end_load_m2v1
-p_c4_load_end = [56.678,126.378,64.477,170.783,-258.123,44.833]
+p_c4_load_end = [56.822,125.691,68.739,162.628,-257.982,43.908]
 # copy of p_unload_m2_wait
 p_c4_unload_wait = [51.507,126.321,64.645,170.483,-262.240,-135.484]
 # copy of p_unload_m2
@@ -203,11 +215,11 @@ p_c6_air_v1 = [56.198,122.439,71.850,164.637,-257.503,-47.180]
 # copy of p_air_c2
 p_c6_air = [55.659,126.993,65.379,166.557,-258.042,-47.170]
 # copy of p_load_m2_wait
-p_c6_load_wait = [50.293,126.775,63.817,171.018,-264.506,44.650]
+p_c6_load_wait = [50.297,126.088,68.080,162.942,-264.499,44.244]
 # copy of p_load_c2
-p_c6_load = [56.589,126.376,64.481,170.780,-258.211,44.831]
+p_c6_load = [56.457,125.684,68.753,162.625,-258.346,43.927]
 # copy of p_end_load_m2v1
-p_c6_load_end = [56.678,126.378,64.477,170.783,-258.123,44.833]
+p_c6_load_end = [56.822,125.691,68.739,162.628,-257.982,43.908]
 # copy of p_unload_m2_wait
 p_c6_unload_wait = [51.507,126.321,64.645,170.483,-262.240,-135.484]
 # copy of p_unload_m2
@@ -222,6 +234,8 @@ cnc_pos_pair = 0
 cnc_pos_mismatch = 0
 # [CNC36] Load the active CNC point set (p_odd_* / p_even_*) from cnc_pair.
 if(cnc_pair == 1):
+    p_odd_door = p_door_c1
+    p_even_door = p_door_c2
     p_odd_user_x_offset = p_c1_user_x_offset
     p_odd_air_v1 = p_air_c1v1
     p_odd_air_switch_tool = p_air_switch_tool
@@ -241,6 +255,8 @@ if(cnc_pair == 1):
     p_even_unload = p_unload_m2
 end
 if(cnc_pair == 2):
+    p_odd_door = p_door_c3
+    p_even_door = p_door_c4
     p_odd_user_x_offset = p_c3_user_x_offset
     p_odd_air_v1 = p_c3_air_v1
     p_odd_air_switch_tool = p_c3_air_switch_tool
@@ -260,6 +276,8 @@ if(cnc_pair == 2):
     p_even_unload = p_c4_unload
 end
 if(cnc_pair == 3):
+    p_odd_door = p_door_c5
+    p_even_door = p_door_c6
     p_odd_user_x_offset = p_c5_user_x_offset
     p_odd_air_v1 = p_c5_air_v1
     p_odd_air_switch_tool = p_c5_air_switch_tool
@@ -489,7 +507,7 @@ while(1):
                 log_message(1,"DI16 EXIT PROCESS BY SAFE REVERSE PATH")
                 if(door_select == 1):
                     log_message(1,"EXIT VIA SELECTED DOORC1")
-                    movj(p_door_c1,0,speed_movej_fast,720,0)
+                    movj(p_odd_door,0,speed_movej_fast,720,0)
                     home_route_hint = 0
                     at_c1_load_wait = 0
                     at_c1_load = 0
@@ -505,7 +523,7 @@ while(1):
                 end
                 if(door_select == 2):
                     log_message(1,"EXIT VIA SELECTED DOORC2")
-                    movj(p_door_c2,0,speed_movej_fast,720,0)
+                    movj(p_even_door,0,speed_movej_fast,720,0)
                     home_route_hint = 0
                     at_c1_load_wait = 0
                     at_c1_load = 0
@@ -695,6 +713,8 @@ while(1):
                 end
                 # [CNC36] Load the active CNC point set (p_odd_* / p_even_*) from cnc_pair.
                 if(cnc_pair == 1):
+                    p_odd_door = p_door_c1
+                    p_even_door = p_door_c2
                     p_odd_user_x_offset = p_c1_user_x_offset
                     p_odd_air_v1 = p_air_c1v1
                     p_odd_air_switch_tool = p_air_switch_tool
@@ -715,6 +735,8 @@ while(1):
                     log_message(1,"ACTIVE POINT SET CNC1 CNC2")
                 end
                 if(cnc_pair == 2):
+                    p_odd_door = p_door_c3
+                    p_even_door = p_door_c4
                     p_odd_user_x_offset = p_c3_user_x_offset
                     p_odd_air_v1 = p_c3_air_v1
                     p_odd_air_switch_tool = p_c3_air_switch_tool
@@ -735,6 +757,8 @@ while(1):
                     log_message(1,"ACTIVE POINT SET CNC3 CNC4")
                 end
                 if(cnc_pair == 3):
+                    p_odd_door = p_door_c5
+                    p_even_door = p_door_c6
                     p_odd_user_x_offset = p_c5_user_x_offset
                     p_odd_air_v1 = p_c5_air_v1
                     p_odd_air_switch_tool = p_c5_air_switch_tool
@@ -947,13 +971,13 @@ while(1):
                     home_best_joint_error = home_test_error
                     home_match_code = 15
                 end
-                home_test_tcp = kine_forward(p_door_c1)
+                home_test_tcp = kine_forward(p_odd_door)
                 home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
                 if(home_test_error < home_best_joint_error):
                     home_best_joint_error = home_test_error
                     home_match_code = 12
                 end
-                home_test_tcp = kine_forward(p_door_c2)
+                home_test_tcp = kine_forward(p_even_door)
                 home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
                 if(home_test_error < home_best_joint_error):
                     home_best_joint_error = home_test_error
@@ -1004,10 +1028,10 @@ while(1):
                     home_match_joint = p_even_air
                 end
                 if(home_match_code == 12):
-                    home_match_joint = p_door_c1
+                    home_match_joint = p_odd_door
                 end
                 if(home_match_code == 13):
-                    home_match_joint = p_door_c2
+                    home_match_joint = p_even_door
                 end
                 if(home_match_code == 15):
                     home_match_joint = p_even_load
@@ -1301,11 +1325,11 @@ while(1):
                     if(home_c1_danger_side == 1):
                         log_message(2,"HOME CNC1 DANGER SIDE DETECTED AFTER POINT CHECK")
                         door_c1_keep_j6_joint = get_atl_joint_pose()
-                        door_c1_keep_j6_joint[0] = -126.687
-                        door_c1_keep_j6_joint[1] = 83.807
-                        door_c1_keep_j6_joint[2] = 112.098
-                        door_c1_keep_j6_joint[3] = 163.645
-                        door_c1_keep_j6_joint[4] = -261.426
+                        door_c1_keep_j6_joint[0] = p_odd_door[0]
+                        door_c1_keep_j6_joint[1] = p_odd_door[1]
+                        door_c1_keep_j6_joint[2] = p_odd_door[2]
+                        door_c1_keep_j6_joint[3] = p_odd_door[3]
+                        door_c1_keep_j6_joint[4] = p_odd_door[4]
                         door_c1_keep_j6_pose = kine_forward(door_c1_keep_j6_joint)
                         log_message(1,"HOME ROUTE MOVEL DOORC1 KEEP CURRENT J6")
                             movl(door_c1_keep_j6_pose,0,30,200,0)
@@ -1334,11 +1358,11 @@ while(1):
                         if(home_c2_danger_side == 1):
                         log_message(2,"HOME CNC2 DANGER SIDE DETECTED AFTER POINT CHECK")
                         door_c2_keep_j6_joint = get_atl_joint_pose()
-                        door_c2_keep_j6_joint[0] = 82.806
-                        door_c2_keep_j6_joint[1] = 67.797
-                        door_c2_keep_j6_joint[2] = 128.293
-                        door_c2_keep_j6_joint[3] = 165.476
-                        door_c2_keep_j6_joint[4] = -230.174
+                        door_c2_keep_j6_joint[0] = p_even_door[0]
+                        door_c2_keep_j6_joint[1] = p_even_door[1]
+                        door_c2_keep_j6_joint[2] = p_even_door[2]
+                        door_c2_keep_j6_joint[3] = p_even_door[3]
+                        door_c2_keep_j6_joint[4] = p_even_door[4]
                         door_c2_keep_j6_pose = kine_forward(door_c2_keep_j6_joint)
                         log_message(1,"HOME ROUTE MOVEL DOORC2 KEEP CURRENT J6")
                             movl(door_c2_keep_j6_pose,0,30,200,0)
@@ -1386,11 +1410,11 @@ while(1):
                     log_message(1,"HOME ROUTE CURRENT AT C1LOADWAIT")
                     log_message(1,"HOME ROUTE MOVEJ DOORC1 START")
                     door_c1_keep_j6_joint = get_atl_joint_pose()
-                    door_c1_keep_j6_joint[0] = -126.687
-                    door_c1_keep_j6_joint[1] = 83.807
-                    door_c1_keep_j6_joint[2] = 112.098
-                    door_c1_keep_j6_joint[3] = 163.645
-                    door_c1_keep_j6_joint[4] = -261.426
+                    door_c1_keep_j6_joint[0] = p_odd_door[0]
+                    door_c1_keep_j6_joint[1] = p_odd_door[1]
+                    door_c1_keep_j6_joint[2] = p_odd_door[2]
+                    door_c1_keep_j6_joint[3] = p_odd_door[3]
+                    door_c1_keep_j6_joint[4] = p_odd_door[4]
                     movj(door_c1_keep_j6_joint,0,speed_movej_fast,720,0)
                     home_route_door_done = 1
                     log_message(1,"HOME ROUTE DOORC1 COMPLETE")
@@ -1418,11 +1442,11 @@ while(1):
                     log_message(1,"HOME ROUTE CURRENT AT C1UNLOADWAIT")
                     log_message(1,"HOME ROUTE MOVEJ DOORC1 START")
                     door_c1_keep_j6_joint = get_atl_joint_pose()
-                    door_c1_keep_j6_joint[0] = -126.687
-                    door_c1_keep_j6_joint[1] = 83.807
-                    door_c1_keep_j6_joint[2] = 112.098
-                    door_c1_keep_j6_joint[3] = 163.645
-                    door_c1_keep_j6_joint[4] = -261.426
+                    door_c1_keep_j6_joint[0] = p_odd_door[0]
+                    door_c1_keep_j6_joint[1] = p_odd_door[1]
+                    door_c1_keep_j6_joint[2] = p_odd_door[2]
+                    door_c1_keep_j6_joint[3] = p_odd_door[3]
+                    door_c1_keep_j6_joint[4] = p_odd_door[4]
                     movj(door_c1_keep_j6_joint,0,speed_movej_fast,720,0)
                     home_route_door_done = 1
                     log_message(1,"HOME ROUTE DOORC1 COMPLETE")
@@ -1463,11 +1487,11 @@ while(1):
                     log_message(1,"HOME ROUTE CURRENT AT LOADM2_WAIT")
                     log_message(1,"HOME ROUTE MOVEJ DOORC2 START")
                     door_c2_keep_j6_joint = get_atl_joint_pose()
-                    door_c2_keep_j6_joint[0] = 82.806
-                    door_c2_keep_j6_joint[1] = 67.797
-                    door_c2_keep_j6_joint[2] = 128.293
-                    door_c2_keep_j6_joint[3] = 165.476
-                    door_c2_keep_j6_joint[4] = -230.174
+                    door_c2_keep_j6_joint[0] = p_even_door[0]
+                    door_c2_keep_j6_joint[1] = p_even_door[1]
+                    door_c2_keep_j6_joint[2] = p_even_door[2]
+                    door_c2_keep_j6_joint[3] = p_even_door[3]
+                    door_c2_keep_j6_joint[4] = p_even_door[4]
                     movj(door_c2_keep_j6_joint,0,speed_movej_fast,720,0)
                     home_route_door_done = 1
                     log_message(1,"HOME ROUTE DOORC2 COMPLETE")
@@ -1486,11 +1510,11 @@ while(1):
                     log_message(1,"HOME ROUTE CURRENT AT UNLOADM2_WAIT")
                     log_message(1,"HOME ROUTE MOVEJ DOORC2 START")
                     door_c2_keep_j6_joint = get_atl_joint_pose()
-                    door_c2_keep_j6_joint[0] = 82.806
-                    door_c2_keep_j6_joint[1] = 67.797
-                    door_c2_keep_j6_joint[2] = 128.293
-                    door_c2_keep_j6_joint[3] = 165.476
-                    door_c2_keep_j6_joint[4] = -230.174
+                    door_c2_keep_j6_joint[0] = p_even_door[0]
+                    door_c2_keep_j6_joint[1] = p_even_door[1]
+                    door_c2_keep_j6_joint[2] = p_even_door[2]
+                    door_c2_keep_j6_joint[3] = p_even_door[3]
+                    door_c2_keep_j6_joint[4] = p_even_door[4]
                     movj(door_c2_keep_j6_joint,0,speed_movej_fast,720,0)
                     home_route_door_done = 1
                     log_message(1,"HOME ROUTE DOORC2 COMPLETE")
@@ -1499,11 +1523,11 @@ while(1):
                     log_message(1,"HOME ROUTE CURRENT AT AIRC2")
                     log_message(1,"HOME ROUTE MOVEJ DOORC2 START")
                     door_c2_keep_j6_joint = get_atl_joint_pose()
-                    door_c2_keep_j6_joint[0] = 82.806
-                    door_c2_keep_j6_joint[1] = 67.797
-                    door_c2_keep_j6_joint[2] = 128.293
-                    door_c2_keep_j6_joint[3] = 165.476
-                    door_c2_keep_j6_joint[4] = -230.174
+                    door_c2_keep_j6_joint[0] = p_even_door[0]
+                    door_c2_keep_j6_joint[1] = p_even_door[1]
+                    door_c2_keep_j6_joint[2] = p_even_door[2]
+                    door_c2_keep_j6_joint[3] = p_even_door[3]
+                    door_c2_keep_j6_joint[4] = p_even_door[4]
                     movj(door_c2_keep_j6_joint,0,speed_movej_fast,720,0)
                     home_route_door_done = 1
                     at_air_c2 = 0
@@ -1533,22 +1557,22 @@ while(1):
                     if(ai16_home_door == 1):
                         log_message(1,"HOME AI16 CNC1 CNC3 CNC5 VIA DOORC1")
                         door_c1_keep_j6_joint = get_atl_joint_pose()
-                        door_c1_keep_j6_joint[0] = -126.687
-                        door_c1_keep_j6_joint[1] = 83.807
-                        door_c1_keep_j6_joint[2] = 112.098
-                        door_c1_keep_j6_joint[3] = 163.645
-                        door_c1_keep_j6_joint[4] = -261.426
+                        door_c1_keep_j6_joint[0] = p_odd_door[0]
+                        door_c1_keep_j6_joint[1] = p_odd_door[1]
+                        door_c1_keep_j6_joint[2] = p_odd_door[2]
+                        door_c1_keep_j6_joint[3] = p_odd_door[3]
+                        door_c1_keep_j6_joint[4] = p_odd_door[4]
                         movj(door_c1_keep_j6_joint,0,speed_movej_fast,720,0)
                         home_route_door_done = 1
                     end
                     if(ai16_home_door == 2):
                         log_message(1,"HOME AI16 CNC2 CNC4 CNC6 VIA DOORC2")
                         door_c2_keep_j6_joint = get_atl_joint_pose()
-                        door_c2_keep_j6_joint[0] = 82.806
-                        door_c2_keep_j6_joint[1] = 67.797
-                        door_c2_keep_j6_joint[2] = 128.293
-                        door_c2_keep_j6_joint[3] = 165.476
-                        door_c2_keep_j6_joint[4] = -230.174
+                        door_c2_keep_j6_joint[0] = p_even_door[0]
+                        door_c2_keep_j6_joint[1] = p_even_door[1]
+                        door_c2_keep_j6_joint[2] = p_even_door[2]
+                        door_c2_keep_j6_joint[3] = p_even_door[3]
+                        door_c2_keep_j6_joint[4] = p_even_door[4]
                         movj(door_c2_keep_j6_joint,0,speed_movej_fast,720,0)
                         home_route_door_done = 1
                     end
@@ -1559,22 +1583,22 @@ while(1):
                     if(home_route_hint == 1):
                         log_message(1,"HOME POSITION ROUTE CNC1 VIA DOORC1")
                         door_c1_keep_j6_joint = get_atl_joint_pose()
-                        door_c1_keep_j6_joint[0] = -126.687
-                        door_c1_keep_j6_joint[1] = 83.807
-                        door_c1_keep_j6_joint[2] = 112.098
-                        door_c1_keep_j6_joint[3] = 163.645
-                        door_c1_keep_j6_joint[4] = -261.426
+                        door_c1_keep_j6_joint[0] = p_odd_door[0]
+                        door_c1_keep_j6_joint[1] = p_odd_door[1]
+                        door_c1_keep_j6_joint[2] = p_odd_door[2]
+                        door_c1_keep_j6_joint[3] = p_odd_door[3]
+                        door_c1_keep_j6_joint[4] = p_odd_door[4]
                         movj(door_c1_keep_j6_joint,0,speed_movej_fast,720,0)
                         home_route_door_done = 1
                     end
                     if(home_route_hint == 2):
                         log_message(1,"HOME POSITION ROUTE CNC2 VIA DOORC2")
                         door_c2_keep_j6_joint = get_atl_joint_pose()
-                        door_c2_keep_j6_joint[0] = 82.806
-                        door_c2_keep_j6_joint[1] = 67.797
-                        door_c2_keep_j6_joint[2] = 128.293
-                        door_c2_keep_j6_joint[3] = 165.476
-                        door_c2_keep_j6_joint[4] = -230.174
+                        door_c2_keep_j6_joint[0] = p_even_door[0]
+                        door_c2_keep_j6_joint[1] = p_even_door[1]
+                        door_c2_keep_j6_joint[2] = p_even_door[2]
+                        door_c2_keep_j6_joint[3] = p_even_door[3]
+                        door_c2_keep_j6_joint[4] = p_even_door[4]
                         movj(door_c2_keep_j6_joint,0,speed_movej_fast,720,0)
                         home_route_door_done = 1
                     end
@@ -1802,6 +1826,85 @@ while(1):
                 if(active_process == 4):
                     door_select = 0
                 end
+                # [CNC36] Select the CNC pair and its point set (incl. Door) before the entry Door move.
+                if(active_process == 2):
+                    cnc_pair = 1
+                end
+                if(active_process == 3):
+                    cnc_pair = 2
+                end
+                if(active_process == 4):
+                    cnc_pair = 3
+                end
+                if(door_select == 0):
+                    # [CNC36] Load the active CNC point set (p_odd_* / p_even_*) from cnc_pair.
+                    if(cnc_pair == 1):
+                        p_odd_door = p_door_c1
+                        p_even_door = p_door_c2
+                        p_odd_user_x_offset = p_c1_user_x_offset
+                        p_odd_air_v1 = p_air_c1v1
+                        p_odd_air_switch_tool = p_air_switch_tool
+                        p_odd_load_wait = p_c1_load_wait
+                        p_odd_load = p_c1_load
+                        p_odd_load_end = p_c1_load_end
+                        p_odd_unload_wait = p_c1_unload_wait
+                        p_odd_unload = p_c1_unload
+                        p_odd_unload_down = p_c1_unload_down
+                        p_even_user_x_offset = p_c2_user_x_offset
+                        p_even_air_v1 = p_air_c2v1
+                        p_even_air = p_air_c2
+                        p_even_load_wait = p_load_m2_wait
+                        p_even_load = p_load_c2
+                        p_even_load_end = p_end_load_m2v1
+                        p_even_unload_wait = p_unload_m2_wait
+                        p_even_unload = p_unload_m2
+                        log_message(1,"ACTIVE POINT SET CNC1 CNC2")
+                    end
+                    if(cnc_pair == 2):
+                        p_odd_door = p_door_c3
+                        p_even_door = p_door_c4
+                        p_odd_user_x_offset = p_c3_user_x_offset
+                        p_odd_air_v1 = p_c3_air_v1
+                        p_odd_air_switch_tool = p_c3_air_switch_tool
+                        p_odd_load_wait = p_c3_load_wait
+                        p_odd_load = p_c3_load
+                        p_odd_load_end = p_c3_load_end
+                        p_odd_unload_wait = p_c3_unload_wait
+                        p_odd_unload = p_c3_unload
+                        p_odd_unload_down = p_c3_unload_down
+                        p_even_user_x_offset = p_c4_user_x_offset
+                        p_even_air_v1 = p_c4_air_v1
+                        p_even_air = p_c4_air
+                        p_even_load_wait = p_c4_load_wait
+                        p_even_load = p_c4_load
+                        p_even_load_end = p_c4_load_end
+                        p_even_unload_wait = p_c4_unload_wait
+                        p_even_unload = p_c4_unload
+                        log_message(1,"ACTIVE POINT SET CNC3 CNC4")
+                    end
+                    if(cnc_pair == 3):
+                        p_odd_door = p_door_c5
+                        p_even_door = p_door_c6
+                        p_odd_user_x_offset = p_c5_user_x_offset
+                        p_odd_air_v1 = p_c5_air_v1
+                        p_odd_air_switch_tool = p_c5_air_switch_tool
+                        p_odd_load_wait = p_c5_load_wait
+                        p_odd_load = p_c5_load
+                        p_odd_load_end = p_c5_load_end
+                        p_odd_unload_wait = p_c5_unload_wait
+                        p_odd_unload = p_c5_unload
+                        p_odd_unload_down = p_c5_unload_down
+                        p_even_user_x_offset = p_c6_user_x_offset
+                        p_even_air_v1 = p_c6_air_v1
+                        p_even_air = p_c6_air
+                        p_even_load_wait = p_c6_load_wait
+                        p_even_load = p_c6_load
+                        p_even_load_end = p_c6_load_end
+                        p_even_unload_wait = p_c6_unload_wait
+                        p_even_unload = p_c6_unload
+                        log_message(1,"ACTIVE POINT SET CNC5 CNC6")
+                    end
+                end
                 if(door_select == 0):
                     log_message(1,"WAIT DI83 DOORC1 OR DI84 DOORC2 ON")
                     while(door_select == 0):
@@ -1820,10 +1923,10 @@ while(1):
                     end
                     if(door_select == 1):
                         log_message(1,"DI83 ON ENTRY MOVEJ DOORC1")
-                        movj(p_door_c1,0,speed_movej_fast,720,0)
+                        movj(p_odd_door,0,speed_movej_fast,720,0)
                     else:
                         log_message(1,"DI84 ON ENTRY MOVEJ DOORC2")
-                        movj(p_door_c2,0,speed_movej_fast,720,0)
+                        movj(p_even_door,0,speed_movej_fast,720,0)
                     end
                     if(active_process == 2):
                         log_message(1,"WAIT DI30 ON OR DI31 ON OR DI32 ON OR DI33 ON")
@@ -2158,6 +2261,8 @@ while(1):
                             if(cnc_motion_case > 0):
                                 # [CNC36] Load the active CNC point set (p_odd_* / p_even_*) from cnc_pair.
                                 if(cnc_pair == 1):
+                                    p_odd_door = p_door_c1
+                                    p_even_door = p_door_c2
                                     p_odd_user_x_offset = p_c1_user_x_offset
                                     p_odd_air_v1 = p_air_c1v1
                                     p_odd_air_switch_tool = p_air_switch_tool
@@ -2178,6 +2283,8 @@ while(1):
                                     log_message(1,"ACTIVE POINT SET CNC1 CNC2")
                                 end
                                 if(cnc_pair == 2):
+                                    p_odd_door = p_door_c3
+                                    p_even_door = p_door_c4
                                     p_odd_user_x_offset = p_c3_user_x_offset
                                     p_odd_air_v1 = p_c3_air_v1
                                     p_odd_air_switch_tool = p_c3_air_switch_tool
@@ -2198,6 +2305,8 @@ while(1):
                                     log_message(1,"ACTIVE POINT SET CNC3 CNC4")
                                 end
                                 if(cnc_pair == 3):
+                                    p_odd_door = p_door_c5
+                                    p_even_door = p_door_c6
                                     p_odd_user_x_offset = p_c5_user_x_offset
                                     p_odd_air_v1 = p_c5_air_v1
                                     p_odd_air_switch_tool = p_c5_air_switch_tool
