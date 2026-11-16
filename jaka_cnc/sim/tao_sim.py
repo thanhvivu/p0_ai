@@ -17,7 +17,14 @@ def dedent(lines):
 def indent(lines,k): return [(' '*k+x) if x.strip() else '' for x in lines]
 def stub(lines):
     out=[]
+    skip=0
     for l in lines:
+        if skip:
+            skip+=dd(l)
+            continue
+        if re.match(r'^while\(di\d+ == 0\):$',l.strip()):
+            skip=1          # drop the whole DI polling loop (its body only re-reads the DI)
+            continue
         ind=l[:len(l)-len(l.lstrip())]
         s=l.strip()
         if re.match(r'^set_digital_output\(4,',s) or re.match(r'^set_analog_output\(4,',s):
@@ -25,8 +32,10 @@ def stub(lines):
         m=re.match(r'^wait_input\(4,(\d+),1,0\)$',s)
         if m:
             out.append(ind+'log_message(1,"SIM SKIP WAIT DI%d")'%(int(m.group(1))+1)); out.append(ind+'sleep(0.3)'); continue
-        m=re.match(r'^(di\d+) = get_digital_input\(4,\d+\)$',s)
-        if m: out.append(ind+'%s = 1'%m.group(1)); continue
+        m=re.match(r'^(di\d+) = get_digital_input\(4,(\d+)\)$',s)
+        if m:
+            # do not assign the diXX variable at all (controller rejected 'di64 = 1')
+            out.append(ind+'log_message(1,"SIM SKIP WAIT DI%d")'%(int(m.group(2))+1)); out.append(ind+'sleep(0.3)'); continue
         l=l.replace('get_analog_input(4,15)','sim_ai16')
         assert 'get_digital_input' not in l and 'wait_input' not in l and 'get_analog_input' not in l, l
         out.append(l)

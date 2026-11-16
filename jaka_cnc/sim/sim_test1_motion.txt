@@ -620,11 +620,8 @@ while(sim_pair > 0):
 
                         sleep(0.01)
                         log_message(1,"P2C2 DO64 ON WAIT DI64 ON CLAMP UNLOAD")
-                        di64 = 1
-                        while(di64 == 0):
-                            sleep(0.1)
-                            di64 = 1
-                        end
+                        log_message(1,"SIM SKIP WAIT DI64")
+                        sleep(0.3)
 
                         sleep(0.01)
                         if(case_motion_ok == 1):
@@ -701,11 +698,8 @@ while(sim_pair > 0):
 
                             sleep(0.01)
                             log_message(1,"P2C3 AT LOADC2 DO61 ON WAIT DI61 ON RELEASE CLAMP")
-                            di61 = 1
-                            while(di61 == 0):
-                                sleep(0.1)
-                                di61 = 1
-                            end
+                            log_message(1,"SIM SKIP WAIT DI61")
+                            sleep(0.3)
                             sleep(0.01)
                             log_message(1,"P2C3 DI61 ON DO61 OFF RELEASE COMPLETE")
 
@@ -720,11 +714,8 @@ while(sim_pair > 0):
                             # the PLC clamps CNC2, CNC4 or CNC6 according to the active Process.
                             sleep(0.01)
                             log_message(1,"P2C3 AT ENDLOADM2V1 DO78 ON WAIT DI78 ON")
-                            di78 = 1
-                            while(di78 == 0):
-                                sleep(0.1)
-                                di78 = 1
-                            end
+                            log_message(1,"SIM SKIP WAIT DI78")
+                            sleep(0.3)
                             sleep(0.01)
                             log_message(1,"P2C3 DI78 ON DO78 OFF COMPLETE")
 
@@ -801,11 +792,8 @@ while(sim_pair > 0):
 
                             sleep(0.01)
                             log_message(1,"P2C4 DO64 ON WAIT DI64 ON CLAMP UNLOAD")
-                            di64 = 1
-                            while(di64 == 0):
-                                sleep(0.1)
-                                di64 = 1
-                            end
+                            log_message(1,"SIM SKIP WAIT DI64")
+                            sleep(0.3)
 
                             sleep(0.01)
                             if(case_motion_ok == 1):
