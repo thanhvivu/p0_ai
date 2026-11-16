@@ -177,3 +177,17 @@ về vị trí cặp 1/2 — hiện code chưa thêm gì cho việc này (P2/P3/
 4. **Chạy lại toàn bộ test của CNC1/CNC2** (regression), vì phần Home đã đổi cách kiểm tra ±5°.
 5. Lặp lại cho `Pos CNC56` (P4, DI40..43, `p_door_c5`, `p_door_c6`, `p_c5_*`, `p_c6_*`).
 6. Lần nạp đầu: chạy DI90 Home một lần ở tốc độ thấp để xác nhận lệnh `door_c1_keep_j6_joint[i] = p_odd_door[i]` được bộ điều khiển chấp nhận.
+
+## 8. Chạy thử trong Simulation khi không giả lập được IO
+
+Thư mục `sim/` chứa 2 chương trình **chỉ dùng trong chế độ Simulation**, sinh tự động từ
+`jamaguchi_cnc36.txt` bằng `sim/tao_sim.py` (khối chuyển động và khối Home được chép nguyên văn).
+Mọi bước chờ tín hiệu PLC được thay bằng `sleep` + log `SIM SKIP WAIT DIxx`; mọi lệnh ghi DO/AO bị bỏ.
+
+| File | Kiểm tra gì |
+|---|---|
+| `sim/sim_test1_motion.txt` | Cặp 1 → 2 → 3, mỗi cặp chạy Case 29 → 30 → 31 → 32: vào bằng cửa → chuyển động Case → ra bằng cửa. Quan sát robot ảo đi đúng đường, không báo lỗi tầm với / kine_inverse. Log phải có `ACTIVE POINT SET CNC1 CNC2`, `...CNC3 CNC4`, `...CNC5 CNC6`. |
+| `sim/sim_test2_home.txt` | 18 phép thử Home: robot MoveJ thẳng tới 1 điểm dạy rồi chạy khối DI90 nguyên văn. So dòng `SIM TEST n EXPECT MATCH ...` với dòng `HOME ACTUAL POSITION MATCH ...` ngay sau nó, và robot phải lùi về Door rồi HomeLocation. |
+
+Sau khi teach điểm CNC3..6 vào `jamaguchi_cnc36.txt`, sinh lại 2 file này
+(`python tao_sim.py ../jamaguchi_cnc36.txt .`) rồi chạy lại để kiểm tra điểm mới trong Simulation trước khi lên máy thật.
