@@ -131,8 +131,8 @@ Mọi chỗ sửa đều có nhãn `[CNC36]`.
    + các lệnh đi về cửa "giữ J6 hiện tại") đều dùng `p_odd_door`/`p_even_door`.
    Trong Home, J1..J5 của cửa trước đây là số viết cứng (`-126.687`, `82.806`...) nay đọc từ
    `p_odd_door[i]` / `p_even_door[i]`. **Code gốc chưa từng dùng phép gán dạng `a[i] = b[i]`**,
-   nên khi nạp chương trình lần đầu cần kiểm tra bộ điều khiển chấp nhận, và chạy thử DI90 một lần
-   ở tốc độ thấp. Nếu bị báo lỗi, báo lại để chuyển sang dạng số viết cứng theo từng cặp.
+   nên đã test riêng trên phần mềm mô phỏng JAKA (2026-11): **không lỗi cú pháp**.
+   Vẫn nên chạy thử DI90 một lần ở tốc độ thấp trên robot thật (firmware thật có thể khác bản mô phỏng).
 
 Không thay đổi: P1, P5–P8, logic DI16/DI17, chọn Process, chọn cửa DI83/DI84,
 trình tự chuyển động (đã xác nhận cặp 3/4, 5/6 chạy cùng kiểu với cặp 1/2),
