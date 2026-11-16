@@ -120,7 +120,19 @@ for k in range(1,len(tests)):
     h+=['    if(sim_t == %d):'%k,'        sim_next = %d'%(k+1),'    end']
 h+=['    sim_t = sim_next','end','log_message(1,"SIM HOME TEST END")','']
 
-for name,txt in [('sim_test1_motion.txt',m),('sim_test2_home.txt',h)]:
+# ---------- 3. P8 change tool ----------
+ce=[i for i,l in enumerate(L) if '# Case execution point' in l][0]
+p8i=[i for i in range(ce,len(L)) if L[i].strip()=='if(active_process == 8):'][0]
+p8=dedent(block_from(p8i))
+t3=WARN+['# SIM TEST 3: P8 Change Tool (dao tool) motion, unchanged except IO stubs.',
+'# Expected: UNLOAD_DAOTOOL_WAIT -> UNLOAD_DAOTOOL -> back -> TRUNGGIAN -> LOAD_DAOTOOL_WAIT',
+'# -> MOVEL straight down 30 mm to LOAD_DAOTOOL -> back -> HOMELOCATION.','']+header+[
+'','log_message(1,"SIM P8 TEST START")',
+'movj(p_home_location,0,speed_movej_fast,720,0)',
+'active_process = 8','active_case = 54','case_motion_ok = 1']+stub(p8)+[
+'log_message(1,"SIM P8 TEST END")','']
+
+for name,txt in [('sim_test1_motion.txt',m),('sim_test2_home.txt',h),('sim_test3_p8.txt',t3)]:
     assert not any(re.search(r'"[^"]*[()][^"]*"',x) for x in txt), 'parentheses inside a string: JAKA parser rejects them'
     assert sum(dd(x) for x in txt)==0, name
     d=0

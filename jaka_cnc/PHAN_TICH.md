@@ -215,3 +215,15 @@ Sau khi teach điểm CNC3..6 vào `jamaguchi_cnc36.txt`, sinh lại 2 file này
 * 2 lỗi `Parsing failed` trong log (22:36:29 và 23:21:24) là lỗi của file test (gán `di64 = 1`,
   dấu ngoặc trong chuỗi log), đã sửa; chương trình chính không có 2 mẫu này.
 * Rút ra: JAKA chỉ báo lỗi cú pháp khi **chạy tới dòng đó**, nên nạp được chưa chứng minh cả file đúng.
+
+## 11. Thay đổi cụm đảo tool P8 (2026-11-17)
+
+* Cập nhật 2 điểm vừa teach lại:
+  `p_load_daotool_wait = [-5.321,90.910,100.547,165.270,-140.056,-48.007]` (TCP Z 355.4),
+  `p_load_daotool = [-5.320,91.879,104.347,160.501,-140.055,-48.007]` (TCP Z 325.4) — chỉ khác 30 mm theo Z.
+* Đoạn LOAD_DAOTOOL_WAIT → LOAD_DAOTOOL đổi từ `movj` sang **`movl`** (đi thẳng xuống):
+  `p_load_daotool_pose = kine_forward(p_load_daotool)` rồi `movl(p_load_daotool_pose,0,speed_movel,200,0)`
+  — cùng cấu trúc với P1 Pick (`movj` tới Wait có blend 10 → `movl` xuống điểm chính xác).
+* Tính lại vùng nhận diện Home `p_load_daotool_segment_min/max` = hai điểm mới ±5°.
+* Đoạn đi lên (LOAD_DAOTOOL → WAIT sau khi kẹp) **giữ nguyên `movj`** như cũ.
+* Test Simulation mới: `sim/sim_test3_p8.txt`.
