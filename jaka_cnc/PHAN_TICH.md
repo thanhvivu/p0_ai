@@ -131,7 +131,8 @@ Mọi chỗ sửa đều có nhãn `[CNC36]`.
    + các lệnh đi về cửa "giữ J6 hiện tại") đều dùng `p_odd_door`/`p_even_door`.
    Trong Home, J1..J5 của cửa trước đây là số viết cứng (`-126.687`, `82.806`...) nay đọc từ
    `p_odd_door[i]` / `p_even_door[i]`. **Code gốc chưa từng dùng phép gán dạng `a[i] = b[i]`**,
-   nên đã test riêng trên phần mềm mô phỏng JAKA (2026-11): **không lỗi cú pháp**.
+   nên đã test riêng trên bộ điều khiển Zu ở chế độ Simulation (2026-11-17): log T2..T7 đều OK —
+   gán phần tử từ mảng khác chép đúng giá trị, phép tính trong `if` đúng, gán nguyên mảng đúng.
    Vẫn nên chạy thử DI90 một lần ở tốc độ thấp trên robot thật (firmware thật có thể khác bản mô phỏng).
 
 Không thay đổi: P1, P5–P8, logic DI16/DI17, chọn Process, chọn cửa DI83/DI84,
