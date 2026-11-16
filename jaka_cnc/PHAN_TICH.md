@@ -148,7 +148,7 @@ chung được khi các cặp máy bố trí giống nhau — nếu cửa CNC3..
 
 Đã xác nhận (2026-11): điểm CNC2 mới teach là đúng; CNC5 đối diện CNC6, 1/3/5 cùng hàng và
 quay mặt về 2/4/6; chuyển động cặp 3/4 và 5/6 làm giống cặp 1/2; điểm CNC3..6 và cửa
-tạm lấy theo cặp 1/2. Tín hiệu kẹp chuck: dùng chung, PLC chọn máy theo Process (mục 1 đã xong). Còn chờ kiểm tra: mục 2; mục 3 giữ nguyên hiện trạng.
+tạm lấy theo cặp 1/2. Tín hiệu kẹp chuck: dùng chung, PLC chọn máy theo Process (mục 1 đã xong). AI16 = số CNC 1..6 (mục 2 đã xong). mục 3 giữ nguyên hiện trạng.
 Ghi chú mục "vị trí trục khi chạy P1/P5–P8": dự kiến robot về điểm trung gian/Home rồi trục mới
 về vị trí cặp 1/2 — hiện code chưa thêm gì cho việc này (P2/P3/P4 thoát vẫn dừng ở cửa).
 
@@ -157,7 +157,8 @@ về vị trí cặp 1/2 — hiện code chưa thêm gì cho việc này (P2/P3/
    (nội dung cũ) **Kẹp chuck CNC3..CNC6**: DO79/DI79 (lẻ) và DO78/DI78 (chẵn) có được PLC định tuyến
    theo AO2 (P3 → CNC3/CNC4, P4 → CNC5/CNC6) không? Nếu không, cần thêm tín hiệu mới trong map
    và sửa 2 chỗ có nhãn `[CNC36]`, mỗi P dùng chỉ số IO literal riêng.
-2. **AI16** chứa **số CNC (1..6)** hay **số vị trí trục Axis1 (1 = CNC12, 2 = CNC34, 3 = CNC56)**?
+2. ~~AI16~~ — **đã xác nhận với PLC: AI16 = số CNC 1..6**, đúng với giả định trong code.
+   (nội dung cũ) **AI16** chứa **số CNC (1..6)** hay **số vị trí trục Axis1 (1 = CNC12, 2 = CNC34, 3 = CNC56)**?
    Code gốc và bản bổ sung đều giả định là số CNC 1..6. Nếu thực tế là vị trí trục 1..3 thì
    phần chọn cửa Home của code gốc **đã sai từ trước**, và phải đổi ngưỡng.
 3. PLC chỉ được di chuyển trục Axis1 khi robot ở Home hoặc ở Door (sau DO17 / DO16), và
