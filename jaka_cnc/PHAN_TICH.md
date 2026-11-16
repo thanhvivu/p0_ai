@@ -227,3 +227,5 @@ Sau khi teach điểm CNC3..6 vào `jamaguchi_cnc36.txt`, sinh lại 2 file này
 * Tính lại vùng nhận diện Home `p_load_daotool_segment_min/max` = hai điểm mới ±5°.
 * Đoạn đi lên (LOAD_DAOTOOL → WAIT sau khi kẹp) **giữ nguyên `movj`** như cũ.
 * Test Simulation mới: `sim/sim_test3_p8.txt`.
+* **Test 3 (P8) trong Simulation 2026-11-16 23:53: đạt** — chạy tới `SIM P8 TEST END`, qua đoạn MoveL mới,
+  kẹp/nhả tool, lùi về Wait và về HomeLocation, không lỗi.
