@@ -229,3 +229,26 @@ Sau khi teach điểm CNC3..6 vào `jamaguchi_cnc36.txt`, sinh lại 2 file này
 * Test Simulation mới: `sim/sim_test3_p8.txt`.
 * **Test 3 (P8) trong Simulation 2026-11-16 23:53: đạt** — chạy tới `SIM P8 TEST END`, qua đoạn MoveL mới,
   kẹp/nhả tool, lùi về Wait và về HomeLocation, không lỗi.
+
+## 12. Checklist log khi chạy thật chu trình máy 1 (P2: Unload CNC1 → Load CNC1)
+
+Log lấy đúng thứ tự từ `jamaguchi_cnc36.txt`. Trong ngoặc là tín hiệu PLC phải gửi.
+
+1. Khởi động: `FULL PROCESS START MODBUS HIGH` → `WAIT DI90 HOME OR DI18-DI27 PROCESS ON` → `STARTUP SCAN DI18-DI27`
+2. Vào P2 (DI19): `DI19 ON ENTER P2 CNC1 CNC2` → `DO16 OFF ROBOT LEAVING HOME` → `CURRENT P2 AO2 2 DO19 ON` →
+   **`ACTIVE POINT SET CNC1 CNC2`** (mới) → `WAIT DI83 DOORC1 OR DI84 DOORC2 ON` → (DI83) `DI83 ON ENTRY MOVEJ DOORC1` →
+   `WAIT DI30 ON OR DI31 ON OR DI32 ON OR DI33 ON`
+3. Unload CNC1 (DI31): `DI31 ON P2 CASE2 UNLOAD CNC1` → **`ACTIVE POINT SET CNC1 CNC2`** →
+   `P2C2 ... AIRC1V1` → (DI74) → `P2C2 ... AIRSWITCHTOOL` → (DI75) → `P2C2 ... C1UNLOADWAIT` → `P2C2 ... C1UNLOAD` →
+   (DI64) → `... C1UNLOADDOWN COMPLETE` → `P2C2 END AT C1UNLOADWAIT` → `P2 CASE2 DO31 ON HOLD UNTIL DI17 ON` →
+   (DI17 lên rồi xuống) `DI17 ON RETURN TO PROCESS SCAN` → `WAIT DI17 OFF` → `CURRENT P2 WAIT DI30 ...`
+4. Load CNC1 (DI30): `DI30 ON P2 CASE1 LOAD CNC1` → **`ACTIVE POINT SET CNC1 CNC2`** →
+   `P2C1 ... AIRC1V1` → (DI74) → `P2C1 ... AIRSWITCHTOOL` → (DI75) → `P2C1 ... C1LOADWAIT` → `P2C1 ... C1LOAD` →
+   (DI61) → `P2C1 ... C1LOADEND` → (DI79 kẹp chuck) → `... RETURN C1LOAD` → `... RETURN C1LOADWAIT` →
+   `P2C1 END AT C1LOADWAIT` → `P2 CASE1 DO30 ON HOLD UNTIL DI17 ON` → (DI17) `DI17 ON RETURN TO PROCESS SCAN`
+5. Thoát (DI16): `DI16 EXIT PROCESS BY SAFE REVERSE PATH` → `EXIT VIA SELECTED DOORC1` →
+   `P2 P3 P4 EXIT COMPLETE AT SELECTED DOOR NO HOME MOVE` → `DI16 ON EXIT CURRENT PROCESS` → `AO2 0 NO ACTIVE PROCESS` →
+   `DO17 ON WAIT DI16 OFF` → (DI16 xuống) `DI16 OFF DO17 OFF` → `WAIT DI90 HOME OR DI18-DI27 PROCESS ON`
+
+Không được xuất hiện: `WARNING AI16 ...`, mọi dòng `... ABORTED ...`, `DI16 CASE NOT COMPLETE HOME MOVE SKIPPED`.
+Khác code gốc: chỉ thêm các dòng `ACTIVE POINT SET CNC1 CNC2`.
