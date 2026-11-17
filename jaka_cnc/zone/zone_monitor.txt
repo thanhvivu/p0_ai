@@ -1,33 +1,72 @@
 # ZONE_MONITOR - run as Sub-thread1 from the main program. No motion commands.
-# X_user / Y_user = TCP in usrfr_thanh (formula inside if: no arithmetic in assignments).
-# DO56 = robot past DoorC1 (odd CNC side), DO57 = past DoorC2 (even CNC side), DO58 = pick zone.
+# DO56 = TCP past DoorC1 (odd CNC side), DO57 = past DoorC2 (even CNC side),
+# DO58 = TCP within 50 mm of the Pick point along Y_user or beyond it.
+# A DO is written only when its state changes, with a log line. Warning only, not safety.
+# X_user / Y_user = TCP in usrfr_thanh; formula inside if() (no arithmetic in assignments).
+# DoorC1 / DoorC2 X from the danger-boundary references in the main program.
 zone_x_door1 = 679.362
 zone_x_door2 = -365.358
-# TODO: Y_user of the Pick point minus 50 mm. DO58 stays OFF until zone_y_enable = 1.
-zone_y_pick_limit = 0.0
-zone_y_enable = 0
+# Pick point TCP in usrfr_thanh = [683.786,1237.165,330.754]; limit = Y_pick - 50 mm.
+zone_y_pick_limit = 1187.165
+zone_odd_last = -1
+zone_even_last = -1
+zone_pick_last = -1
+log_message(1,"ZONE MONITOR STARTED")
 while(1):
     zone_tcp = get_atl_tcp_pose()
+    zone_odd = 0
     if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
-        set_digital_output(4,55,1,1)
-    else:
-        set_digital_output(4,55,0,1)
+        zone_odd = 1
     end
+    zone_even = 0
     if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2):
-        set_digital_output(4,56,1,1)
-    else:
-        set_digital_output(4,56,0,1)
+        zone_even = 1
     end
     zone_pick = 0
-    if(zone_y_enable == 1):
-        if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > zone_y_pick_limit):
-            zone_pick = 1
+    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > zone_y_pick_limit):
+        zone_pick = 1
+    end
+    zone_chg = 1
+    if(zone_odd == zone_odd_last):
+        zone_chg = 0
+    end
+    if(zone_chg == 1):
+        if(zone_odd == 1):
+            set_digital_output(4,55,1,1)
+            log_message(1,"DO56 ODD CNC ZONE ON")
+        else:
+            set_digital_output(4,55,0,1)
+            log_message(1,"DO56 ODD CNC ZONE OFF")
         end
     end
-    if(zone_pick == 1):
-        set_digital_output(4,57,1,1)
-    else:
-        set_digital_output(4,57,0,1)
+    zone_odd_last = zone_odd
+    zone_chg = 1
+    if(zone_even == zone_even_last):
+        zone_chg = 0
     end
+    if(zone_chg == 1):
+        if(zone_even == 1):
+            set_digital_output(4,56,1,1)
+            log_message(1,"DO57 EVEN CNC ZONE ON")
+        else:
+            set_digital_output(4,56,0,1)
+            log_message(1,"DO57 EVEN CNC ZONE OFF")
+        end
+    end
+    zone_even_last = zone_even
+    zone_chg = 1
+    if(zone_pick == zone_pick_last):
+        zone_chg = 0
+    end
+    if(zone_chg == 1):
+        if(zone_pick == 1):
+            set_digital_output(4,57,1,1)
+            log_message(1,"DO58 PICK ZONE ON")
+        else:
+            set_digital_output(4,57,0,1)
+            log_message(1,"DO58 PICK ZONE OFF")
+        end
+    end
+    zone_pick_last = zone_pick
     sleep(0.05)
 end

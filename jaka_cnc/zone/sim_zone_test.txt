@@ -1,4 +1,4 @@
-# !!! SIMULATION ONLY !!! Zone-check test: DO writes replaced by sleep, states are logged.
+# !!! SIMULATION ONLY !!! zone check after each move; DO writes replaced by sleep, ON/OFF logs kept.
 
 # [CNC36] 2026-11: extended for CNC3..CNC6 (P3 = CNC3/CNC4, P4 = CNC5/CNC6).
 #   Search "[CNC36]" for every change. Motion code is shared; only the point set changes.
@@ -361,34 +361,18 @@ p_home_location_min = [-48.100,51.711,101.885,189.140,-269.961,43.660]
 p_home_location_max = [-38.100,61.711,111.885,199.140,-259.961,53.660]
 
 
-# ===== ZONE CHECK - INIT (run once, after the taught points are declared) =====
-# Robot working-zone bits for the PLC. TCP is converted from Base to usrfr_thanh
-# [345.833,-489.782,-136.233,-0.093,-0.065,45.114] inside each if(), because this
-# controller rejects arithmetic in assignments. Not a safety function.
-# DO56 idx55 = robot inside odd CNC side  (X_user > zone_x_door1, CNC1/3/5)
-# DO57 idx56 = robot inside even CNC side (X_user < zone_x_door2, CNC2/4/6)
-# DO58 idx57 = robot inside Pick/supply zone (Y_user past y_pick - margin, toward Pick)
-# Constants can be tuned here; they are approximate on purpose.
+# X_user / Y_user = TCP in usrfr_thanh; formula inside if() (no arithmetic in assignments).
+# DoorC1 / DoorC2 X from the danger-boundary references in the main program.
 zone_x_door1 = 679.362
 zone_x_door2 = -365.358
-zone_pick_margin = 50.0
-zone_pick_tcp = kine_forward(p_pick)
-zone_home_tcp = kine_forward(p_home_location)
-# Pick side along Y_user is detected from HomeLocation: +1 Pick has larger Y, -1 smaller Y.
-zone_pick_side = 1
-if((-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) < (-0.7085100607 * (zone_home_tcp[0] - 345.833) + 0.7056988446 * (zone_home_tcp[1] + 489.782) - 0.0016231544 * (zone_home_tcp[2] + 136.233))):
-    zone_pick_side = -1
-end
-zone_odd = 0
-zone_even = 0
-zone_pick = 0
+# Pick point TCP in usrfr_thanh = [683.786,1237.165,330.754]; limit = Y_pick - 50 mm.
+zone_y_pick_limit = 1187.165
 zone_odd_last = -1
 zone_even_last = -1
 zone_pick_last = -1
 log_message(1,"SIM ZONE TEST START")
-log_message(1,"SIM ZONE 1 MOVE TO HOMELOCATION EXPECT ODD 0 EVEN 0")
+log_message(1,"SIM ZONE 1 AT HOMELOCATION EXPECT ALL OFF")
 movj(p_home_location,0,speed_movej_fast,720,0)
-# ===== ZONE CHECK - CALL (repeat as often as possible) =====
 zone_tcp = get_atl_tcp_pose()
 zone_odd = 0
 if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
@@ -399,16 +383,9 @@ if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.7
     zone_even = 1
 end
 zone_pick = 0
-if(zone_pick_side == 1):
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) - zone_pick_margin):
-        zone_pick = 1
-    end
-else:
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) < (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) + zone_pick_margin):
-        zone_pick = 1
-    end
+if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > zone_y_pick_limit):
+    zone_pick = 1
 end
-# Write a DO only when its state changes; literal values only.
 zone_chg = 1
 if(zone_odd == zone_odd_last):
     zone_chg = 0
@@ -451,24 +428,8 @@ if(zone_chg == 1):
     end
 end
 zone_pick_last = zone_pick
-if(zone_odd == 1):
-    log_message(1,"SIM ZONE STATE ODD 1")
-else:
-    log_message(1,"SIM ZONE STATE ODD 0")
-end
-if(zone_even == 1):
-    log_message(1,"SIM ZONE STATE EVEN 1")
-else:
-    log_message(1,"SIM ZONE STATE EVEN 0")
-end
-if(zone_pick == 1):
-    log_message(1,"SIM ZONE STATE PICK 1")
-else:
-    log_message(1,"SIM ZONE STATE PICK 0")
-end
-log_message(1,"SIM ZONE 2 MOVE TO PICKWAIT EXPECT PICK 1 if within margin")
+log_message(1,"SIM ZONE 2 AT PICKWAIT EXPECT DO58 ON IF WITHIN 50 MM")
 movj(p_pick_true_axis,0,speed_movej_fast,720,0)
-# ===== ZONE CHECK - CALL (repeat as often as possible) =====
 zone_tcp = get_atl_tcp_pose()
 zone_odd = 0
 if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
@@ -479,16 +440,9 @@ if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.7
     zone_even = 1
 end
 zone_pick = 0
-if(zone_pick_side == 1):
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) - zone_pick_margin):
-        zone_pick = 1
-    end
-else:
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) < (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) + zone_pick_margin):
-        zone_pick = 1
-    end
+if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > zone_y_pick_limit):
+    zone_pick = 1
 end
-# Write a DO only when its state changes; literal values only.
 zone_chg = 1
 if(zone_odd == zone_odd_last):
     zone_chg = 0
@@ -531,24 +485,8 @@ if(zone_chg == 1):
     end
 end
 zone_pick_last = zone_pick
-if(zone_odd == 1):
-    log_message(1,"SIM ZONE STATE ODD 1")
-else:
-    log_message(1,"SIM ZONE STATE ODD 0")
-end
-if(zone_even == 1):
-    log_message(1,"SIM ZONE STATE EVEN 1")
-else:
-    log_message(1,"SIM ZONE STATE EVEN 0")
-end
-if(zone_pick == 1):
-    log_message(1,"SIM ZONE STATE PICK 1")
-else:
-    log_message(1,"SIM ZONE STATE PICK 0")
-end
-log_message(1,"SIM ZONE 3 MOVE TO PICK EXPECT PICK 1")
+log_message(1,"SIM ZONE 3 AT PICK EXPECT DO58 ON")
 movj(p_pick,0,speed_movej_fast,720,0)
-# ===== ZONE CHECK - CALL (repeat as often as possible) =====
 zone_tcp = get_atl_tcp_pose()
 zone_odd = 0
 if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
@@ -559,16 +497,9 @@ if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.7
     zone_even = 1
 end
 zone_pick = 0
-if(zone_pick_side == 1):
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) - zone_pick_margin):
-        zone_pick = 1
-    end
-else:
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) < (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) + zone_pick_margin):
-        zone_pick = 1
-    end
+if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > zone_y_pick_limit):
+    zone_pick = 1
 end
-# Write a DO only when its state changes; literal values only.
 zone_chg = 1
 if(zone_odd == zone_odd_last):
     zone_chg = 0
@@ -611,24 +542,8 @@ if(zone_chg == 1):
     end
 end
 zone_pick_last = zone_pick
-if(zone_odd == 1):
-    log_message(1,"SIM ZONE STATE ODD 1")
-else:
-    log_message(1,"SIM ZONE STATE ODD 0")
-end
-if(zone_even == 1):
-    log_message(1,"SIM ZONE STATE EVEN 1")
-else:
-    log_message(1,"SIM ZONE STATE EVEN 0")
-end
-if(zone_pick == 1):
-    log_message(1,"SIM ZONE STATE PICK 1")
-else:
-    log_message(1,"SIM ZONE STATE PICK 0")
-end
-log_message(1,"SIM ZONE 4 MOVE TO HOMELOCATION EXPECT PICK 0")
+log_message(1,"SIM ZONE 4 AT HOMELOCATION EXPECT DO58 OFF")
 movj(p_home_location,0,speed_movej_fast,720,0)
-# ===== ZONE CHECK - CALL (repeat as often as possible) =====
 zone_tcp = get_atl_tcp_pose()
 zone_odd = 0
 if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
@@ -639,16 +554,9 @@ if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.7
     zone_even = 1
 end
 zone_pick = 0
-if(zone_pick_side == 1):
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) - zone_pick_margin):
-        zone_pick = 1
-    end
-else:
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) < (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) + zone_pick_margin):
-        zone_pick = 1
-    end
+if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > zone_y_pick_limit):
+    zone_pick = 1
 end
-# Write a DO only when its state changes; literal values only.
 zone_chg = 1
 if(zone_odd == zone_odd_last):
     zone_chg = 0
@@ -691,24 +599,8 @@ if(zone_chg == 1):
     end
 end
 zone_pick_last = zone_pick
-if(zone_odd == 1):
-    log_message(1,"SIM ZONE STATE ODD 1")
-else:
-    log_message(1,"SIM ZONE STATE ODD 0")
-end
-if(zone_even == 1):
-    log_message(1,"SIM ZONE STATE EVEN 1")
-else:
-    log_message(1,"SIM ZONE STATE EVEN 0")
-end
-if(zone_pick == 1):
-    log_message(1,"SIM ZONE STATE PICK 1")
-else:
-    log_message(1,"SIM ZONE STATE PICK 0")
-end
-log_message(1,"SIM ZONE 5 MOVE TO DOORC1 EXPECT ODD 0 or flicker   on boundary")
+log_message(1,"SIM ZONE 5 AT DOORC1 EXPECT ON BOUNDARY")
 movj(p_door_c1,0,speed_movej_fast,720,0)
-# ===== ZONE CHECK - CALL (repeat as often as possible) =====
 zone_tcp = get_atl_tcp_pose()
 zone_odd = 0
 if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
@@ -719,16 +611,9 @@ if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.7
     zone_even = 1
 end
 zone_pick = 0
-if(zone_pick_side == 1):
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) - zone_pick_margin):
-        zone_pick = 1
-    end
-else:
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) < (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) + zone_pick_margin):
-        zone_pick = 1
-    end
+if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > zone_y_pick_limit):
+    zone_pick = 1
 end
-# Write a DO only when its state changes; literal values only.
 zone_chg = 1
 if(zone_odd == zone_odd_last):
     zone_chg = 0
@@ -771,24 +656,8 @@ if(zone_chg == 1):
     end
 end
 zone_pick_last = zone_pick
-if(zone_odd == 1):
-    log_message(1,"SIM ZONE STATE ODD 1")
-else:
-    log_message(1,"SIM ZONE STATE ODD 0")
-end
-if(zone_even == 1):
-    log_message(1,"SIM ZONE STATE EVEN 1")
-else:
-    log_message(1,"SIM ZONE STATE EVEN 0")
-end
-if(zone_pick == 1):
-    log_message(1,"SIM ZONE STATE PICK 1")
-else:
-    log_message(1,"SIM ZONE STATE PICK 0")
-end
-log_message(1,"SIM ZONE 6 MOVE TO C1LOADWAIT EXPECT ODD 1")
+log_message(1,"SIM ZONE 6 AT C1LOADWAIT EXPECT DO56 ON")
 movj(p_odd_load_wait,0,speed_movej_fast,720,0)
-# ===== ZONE CHECK - CALL (repeat as often as possible) =====
 zone_tcp = get_atl_tcp_pose()
 zone_odd = 0
 if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
@@ -799,16 +668,9 @@ if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.7
     zone_even = 1
 end
 zone_pick = 0
-if(zone_pick_side == 1):
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) - zone_pick_margin):
-        zone_pick = 1
-    end
-else:
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) < (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) + zone_pick_margin):
-        zone_pick = 1
-    end
+if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > zone_y_pick_limit):
+    zone_pick = 1
 end
-# Write a DO only when its state changes; literal values only.
 zone_chg = 1
 if(zone_odd == zone_odd_last):
     zone_chg = 0
@@ -851,24 +713,8 @@ if(zone_chg == 1):
     end
 end
 zone_pick_last = zone_pick
-if(zone_odd == 1):
-    log_message(1,"SIM ZONE STATE ODD 1")
-else:
-    log_message(1,"SIM ZONE STATE ODD 0")
-end
-if(zone_even == 1):
-    log_message(1,"SIM ZONE STATE EVEN 1")
-else:
-    log_message(1,"SIM ZONE STATE EVEN 0")
-end
-if(zone_pick == 1):
-    log_message(1,"SIM ZONE STATE PICK 1")
-else:
-    log_message(1,"SIM ZONE STATE PICK 0")
-end
-log_message(1,"SIM ZONE 7 MOVE TO C1LOAD EXPECT ODD 1")
+log_message(1,"SIM ZONE 7 AT C1LOAD EXPECT DO56 ON")
 movj(p_odd_load,0,speed_movej_fast,720,0)
-# ===== ZONE CHECK - CALL (repeat as often as possible) =====
 zone_tcp = get_atl_tcp_pose()
 zone_odd = 0
 if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
@@ -879,16 +725,9 @@ if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.7
     zone_even = 1
 end
 zone_pick = 0
-if(zone_pick_side == 1):
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) - zone_pick_margin):
-        zone_pick = 1
-    end
-else:
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) < (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) + zone_pick_margin):
-        zone_pick = 1
-    end
+if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > zone_y_pick_limit):
+    zone_pick = 1
 end
-# Write a DO only when its state changes; literal values only.
 zone_chg = 1
 if(zone_odd == zone_odd_last):
     zone_chg = 0
@@ -931,24 +770,8 @@ if(zone_chg == 1):
     end
 end
 zone_pick_last = zone_pick
-if(zone_odd == 1):
-    log_message(1,"SIM ZONE STATE ODD 1")
-else:
-    log_message(1,"SIM ZONE STATE ODD 0")
-end
-if(zone_even == 1):
-    log_message(1,"SIM ZONE STATE EVEN 1")
-else:
-    log_message(1,"SIM ZONE STATE EVEN 0")
-end
-if(zone_pick == 1):
-    log_message(1,"SIM ZONE STATE PICK 1")
-else:
-    log_message(1,"SIM ZONE STATE PICK 0")
-end
-log_message(1,"SIM ZONE 8 MOVE TO DOORC1 EXPECT ODD back to 0")
+log_message(1,"SIM ZONE 8 AT DOORC1 EXPECT ON BOUNDARY")
 movj(p_door_c1,0,speed_movej_fast,720,0)
-# ===== ZONE CHECK - CALL (repeat as often as possible) =====
 zone_tcp = get_atl_tcp_pose()
 zone_odd = 0
 if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
@@ -959,16 +782,9 @@ if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.7
     zone_even = 1
 end
 zone_pick = 0
-if(zone_pick_side == 1):
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) - zone_pick_margin):
-        zone_pick = 1
-    end
-else:
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) < (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) + zone_pick_margin):
-        zone_pick = 1
-    end
+if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > zone_y_pick_limit):
+    zone_pick = 1
 end
-# Write a DO only when its state changes; literal values only.
 zone_chg = 1
 if(zone_odd == zone_odd_last):
     zone_chg = 0
@@ -1011,24 +827,8 @@ if(zone_chg == 1):
     end
 end
 zone_pick_last = zone_pick
-if(zone_odd == 1):
-    log_message(1,"SIM ZONE STATE ODD 1")
-else:
-    log_message(1,"SIM ZONE STATE ODD 0")
-end
-if(zone_even == 1):
-    log_message(1,"SIM ZONE STATE EVEN 1")
-else:
-    log_message(1,"SIM ZONE STATE EVEN 0")
-end
-if(zone_pick == 1):
-    log_message(1,"SIM ZONE STATE PICK 1")
-else:
-    log_message(1,"SIM ZONE STATE PICK 0")
-end
-log_message(1,"SIM ZONE 9 MOVE TO DOORC2 EXPECT EVEN 0 or flicker   on boundary")
+log_message(1,"SIM ZONE 9 AT DOORC2 EXPECT ON BOUNDARY")
 movj(p_door_c2,0,speed_movej_fast,720,0)
-# ===== ZONE CHECK - CALL (repeat as often as possible) =====
 zone_tcp = get_atl_tcp_pose()
 zone_odd = 0
 if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
@@ -1039,16 +839,9 @@ if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.7
     zone_even = 1
 end
 zone_pick = 0
-if(zone_pick_side == 1):
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) - zone_pick_margin):
-        zone_pick = 1
-    end
-else:
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) < (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) + zone_pick_margin):
-        zone_pick = 1
-    end
+if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > zone_y_pick_limit):
+    zone_pick = 1
 end
-# Write a DO only when its state changes; literal values only.
 zone_chg = 1
 if(zone_odd == zone_odd_last):
     zone_chg = 0
@@ -1091,24 +884,8 @@ if(zone_chg == 1):
     end
 end
 zone_pick_last = zone_pick
-if(zone_odd == 1):
-    log_message(1,"SIM ZONE STATE ODD 1")
-else:
-    log_message(1,"SIM ZONE STATE ODD 0")
-end
-if(zone_even == 1):
-    log_message(1,"SIM ZONE STATE EVEN 1")
-else:
-    log_message(1,"SIM ZONE STATE EVEN 0")
-end
-if(zone_pick == 1):
-    log_message(1,"SIM ZONE STATE PICK 1")
-else:
-    log_message(1,"SIM ZONE STATE PICK 0")
-end
-log_message(1,"SIM ZONE 10 MOVE TO LOADM2_WAIT EXPECT EVEN 1")
+log_message(1,"SIM ZONE 10 AT LOADM2_WAIT EXPECT DO57 ON")
 movj(p_even_load_wait,0,speed_movej_fast,720,0)
-# ===== ZONE CHECK - CALL (repeat as often as possible) =====
 zone_tcp = get_atl_tcp_pose()
 zone_odd = 0
 if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
@@ -1119,16 +896,9 @@ if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.7
     zone_even = 1
 end
 zone_pick = 0
-if(zone_pick_side == 1):
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) - zone_pick_margin):
-        zone_pick = 1
-    end
-else:
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) < (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) + zone_pick_margin):
-        zone_pick = 1
-    end
+if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > zone_y_pick_limit):
+    zone_pick = 1
 end
-# Write a DO only when its state changes; literal values only.
 zone_chg = 1
 if(zone_odd == zone_odd_last):
     zone_chg = 0
@@ -1171,24 +941,8 @@ if(zone_chg == 1):
     end
 end
 zone_pick_last = zone_pick
-if(zone_odd == 1):
-    log_message(1,"SIM ZONE STATE ODD 1")
-else:
-    log_message(1,"SIM ZONE STATE ODD 0")
-end
-if(zone_even == 1):
-    log_message(1,"SIM ZONE STATE EVEN 1")
-else:
-    log_message(1,"SIM ZONE STATE EVEN 0")
-end
-if(zone_pick == 1):
-    log_message(1,"SIM ZONE STATE PICK 1")
-else:
-    log_message(1,"SIM ZONE STATE PICK 0")
-end
-log_message(1,"SIM ZONE 11 MOVE TO LOADC2 EXPECT EVEN 1")
+log_message(1,"SIM ZONE 11 AT LOADC2 EXPECT DO57 ON")
 movj(p_even_load,0,speed_movej_fast,720,0)
-# ===== ZONE CHECK - CALL (repeat as often as possible) =====
 zone_tcp = get_atl_tcp_pose()
 zone_odd = 0
 if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
@@ -1199,16 +953,9 @@ if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.7
     zone_even = 1
 end
 zone_pick = 0
-if(zone_pick_side == 1):
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) - zone_pick_margin):
-        zone_pick = 1
-    end
-else:
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) < (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) + zone_pick_margin):
-        zone_pick = 1
-    end
+if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > zone_y_pick_limit):
+    zone_pick = 1
 end
-# Write a DO only when its state changes; literal values only.
 zone_chg = 1
 if(zone_odd == zone_odd_last):
     zone_chg = 0
@@ -1251,104 +998,8 @@ if(zone_chg == 1):
     end
 end
 zone_pick_last = zone_pick
-if(zone_odd == 1):
-    log_message(1,"SIM ZONE STATE ODD 1")
-else:
-    log_message(1,"SIM ZONE STATE ODD 0")
-end
-if(zone_even == 1):
-    log_message(1,"SIM ZONE STATE EVEN 1")
-else:
-    log_message(1,"SIM ZONE STATE EVEN 0")
-end
-if(zone_pick == 1):
-    log_message(1,"SIM ZONE STATE PICK 1")
-else:
-    log_message(1,"SIM ZONE STATE PICK 0")
-end
-log_message(1,"SIM ZONE 12 MOVE TO DOORC2 EXPECT EVEN back to 0")
-movj(p_door_c2,0,speed_movej_fast,720,0)
-# ===== ZONE CHECK - CALL (repeat as often as possible) =====
-zone_tcp = get_atl_tcp_pose()
-zone_odd = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
-    zone_odd = 1
-end
-zone_even = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2):
-    zone_even = 1
-end
-zone_pick = 0
-if(zone_pick_side == 1):
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) - zone_pick_margin):
-        zone_pick = 1
-    end
-else:
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) < (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) + zone_pick_margin):
-        zone_pick = 1
-    end
-end
-# Write a DO only when its state changes; literal values only.
-zone_chg = 1
-if(zone_odd == zone_odd_last):
-    zone_chg = 0
-end
-if(zone_chg == 1):
-    if(zone_odd == 1):
-        sleep(0.01)
-        log_message(1,"DO56 ODD CNC ZONE ON")
-    else:
-        sleep(0.01)
-        log_message(1,"DO56 ODD CNC ZONE OFF")
-    end
-end
-zone_odd_last = zone_odd
-zone_chg = 1
-if(zone_even == zone_even_last):
-    zone_chg = 0
-end
-if(zone_chg == 1):
-    if(zone_even == 1):
-        sleep(0.01)
-        log_message(1,"DO57 EVEN CNC ZONE ON")
-    else:
-        sleep(0.01)
-        log_message(1,"DO57 EVEN CNC ZONE OFF")
-    end
-end
-zone_even_last = zone_even
-zone_chg = 1
-if(zone_pick == zone_pick_last):
-    zone_chg = 0
-end
-if(zone_chg == 1):
-    if(zone_pick == 1):
-        sleep(0.01)
-        log_message(1,"DO58 PICK ZONE ON")
-    else:
-        sleep(0.01)
-        log_message(1,"DO58 PICK ZONE OFF")
-    end
-end
-zone_pick_last = zone_pick
-if(zone_odd == 1):
-    log_message(1,"SIM ZONE STATE ODD 1")
-else:
-    log_message(1,"SIM ZONE STATE ODD 0")
-end
-if(zone_even == 1):
-    log_message(1,"SIM ZONE STATE EVEN 1")
-else:
-    log_message(1,"SIM ZONE STATE EVEN 0")
-end
-if(zone_pick == 1):
-    log_message(1,"SIM ZONE STATE PICK 1")
-else:
-    log_message(1,"SIM ZONE STATE PICK 0")
-end
-log_message(1,"SIM ZONE 13 MOVE TO HOMELOCATION EXPECT all 0")
+log_message(1,"SIM ZONE 12 AT HOMELOCATION EXPECT ALL OFF")
 movj(p_home_location,0,speed_movej_fast,720,0)
-# ===== ZONE CHECK - CALL (repeat as often as possible) =====
 zone_tcp = get_atl_tcp_pose()
 zone_odd = 0
 if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
@@ -1359,16 +1010,9 @@ if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.7
     zone_even = 1
 end
 zone_pick = 0
-if(zone_pick_side == 1):
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) - zone_pick_margin):
-        zone_pick = 1
-    end
-else:
-    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) < (-0.7085100607 * (zone_pick_tcp[0] - 345.833) + 0.7056988446 * (zone_pick_tcp[1] + 489.782) - 0.0016231544 * (zone_pick_tcp[2] + 136.233)) + zone_pick_margin):
-        zone_pick = 1
-    end
+if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) > zone_y_pick_limit):
+    zone_pick = 1
 end
-# Write a DO only when its state changes; literal values only.
 zone_chg = 1
 if(zone_odd == zone_odd_last):
     zone_chg = 0
@@ -1411,19 +1055,4 @@ if(zone_chg == 1):
     end
 end
 zone_pick_last = zone_pick
-if(zone_odd == 1):
-    log_message(1,"SIM ZONE STATE ODD 1")
-else:
-    log_message(1,"SIM ZONE STATE ODD 0")
-end
-if(zone_even == 1):
-    log_message(1,"SIM ZONE STATE EVEN 1")
-else:
-    log_message(1,"SIM ZONE STATE EVEN 0")
-end
-if(zone_pick == 1):
-    log_message(1,"SIM ZONE STATE PICK 1")
-else:
-    log_message(1,"SIM ZONE STATE PICK 0")
-end
 log_message(1,"SIM ZONE TEST END")
