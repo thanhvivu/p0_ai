@@ -294,3 +294,8 @@ Khác code gốc: chỉ thêm các dòng `ACTIVE POINT SET CNC1 CNC2`.
 * Đã xác nhận: tọa độ màn hình teach là hệ user `usrfr_thanh`; robot chỉ ra Pick khi trục ở vị trí CNC1/2
   nên DO58 có nghĩa đúng.
 * Còn chờ: cú pháp script của khối Run Program Sub-thread; PLC map DO56–DO58.
+* Cách chạy đã chốt (2026-11-18): chương trình khung kéo thả `New Program` =
+  **Run Program: Sub-thread1 → `check_workzone`** (Sub script `checkworkzone` = `zone_monitor.txt`),
+  sau đó **Loop 1 → Sub script chính (`jamaguchi_cnc36.txt`)**. Không sửa code chính.
+  Nếu cần `set_tool_id(1)` / `set_user_frame_id(7)`: đặt trong khung kéo thả trước khối Run Program.
+* Test song song trong Simulation: Sub-thread1 = `zone/sim_zone_monitor.txt`, Sub chính = `sim/sim_test1_motion.txt`.

@@ -35,6 +35,10 @@ mon=['# ZONE_MONITOR - run as Sub-thread1 from the main program. No motion comma
 '# A DO is written only when its state changes, with a log line. Warning only, not safety.']+consts+[
 'log_message(1,"ZONE MONITOR STARTED")','while(1):']+['    '+x for x in check]+['    sleep(0.05)','end','']
 ok(mon); open(outdir+'/zone_monitor.txt','w',newline='').write('\r\n'.join(mon))
+# simulation copy for the parallel test: DO writes replaced by sleep, ON/OFF logs kept
+simmon=['# !!! SIMULATION ONLY !!! zone_monitor without DO writes; run as Sub-thread1 next to sim_test1_motion.']+[
+    (x[:len(x)-len(x.lstrip())]+'sleep(0.01)') if x.strip().startswith('set_digital_output(') else x for x in mon]
+ok(simmon); open(outdir+'/sim_zone_monitor.txt','w',newline='').write('\r\n'.join(simmon))
 L=open(main_src).read().replace('\r','').split('\n')
 he=[i for i,l in enumerate(L) if l.startswith('# Reset common and Process interlock outputs')][0]
 stub=lambda ls:[(x[:len(x)-len(x.lstrip())]+'sleep(0.01)') if x.strip().startswith('set_digital_output(') else x for x in ls]
