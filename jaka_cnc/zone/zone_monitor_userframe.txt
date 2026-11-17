@@ -1,0 +1,72 @@
+# ZONE_MONITOR (user-frame version) - run as Sub-thread1. No motion commands.
+# USE ONLY IF sim_frame_test.txt logged "A ATL TCP = USER FRAME 7".
+# Tool "thanh" id 1 and user frame "usrfr_thanh" id 7 are robot-wide settings: the main
+# program must run with the same ids (it is taught/validated with them).
+set_tool_id(1)
+set_user_frame_id(7)
+zone_x_door1 = 679.362
+zone_x_door2 = -365.358
+# Pick Y_user 1237.165 - 50 mm
+zone_y_pick_limit = 1187.165
+zone_odd_last = -1
+zone_even_last = -1
+zone_pick_last = -1
+log_message(1,"ZONE MONITOR STARTED USER FRAME 7 TOOL 1")
+while(1):
+    zone_tcp = get_atl_tcp_pose()
+    zone_odd = 0
+    if(zone_tcp[0] > zone_x_door1):
+        zone_odd = 1
+    end
+    zone_even = 0
+    if(zone_tcp[0] < zone_x_door2):
+        zone_even = 1
+    end
+    zone_pick = 0
+    if(zone_tcp[1] > zone_y_pick_limit):
+        zone_pick = 1
+    end
+    zone_chg = 1
+    if(zone_odd == zone_odd_last):
+        zone_chg = 0
+    end
+    if(zone_chg == 1):
+        if(zone_odd == 1):
+            set_digital_output(4,55,1,1)
+            log_message(1,"DO56 ODD CNC ZONE ON")
+        else:
+            set_digital_output(4,55,0,1)
+            log_message(1,"DO56 ODD CNC ZONE OFF")
+        end
+    end
+    zone_odd_last = zone_odd
+    zone_chg = 1
+    if(zone_even == zone_even_last):
+        zone_chg = 0
+    end
+    if(zone_chg == 1):
+        if(zone_even == 1):
+            set_digital_output(4,56,1,1)
+            log_message(1,"DO57 EVEN CNC ZONE ON")
+        else:
+            set_digital_output(4,56,0,1)
+            log_message(1,"DO57 EVEN CNC ZONE OFF")
+        end
+    end
+    zone_even_last = zone_even
+    zone_chg = 1
+    if(zone_pick == zone_pick_last):
+        zone_chg = 0
+    end
+    if(zone_chg == 1):
+        if(zone_pick == 1):
+            set_digital_output(4,57,1,1)
+            log_message(1,"DO58 PICK ZONE ON")
+        else:
+            set_digital_output(4,57,0,1)
+            log_message(1,"DO58 PICK ZONE OFF")
+        end
+    end
+    zone_pick_last = zone_pick
+    sleep(0.05)
+end
