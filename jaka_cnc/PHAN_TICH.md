@@ -303,3 +303,11 @@ Khác code gốc: chỉ thêm các dòng `ACTIVE POINT SET CNC1 CNC2`.
   bit đổi trong lúc robot đang di chuyển. Phát hiện: robot đứng ở Door đã bị tính là trong máy (ngưỡng = đúng X cửa),
   và Pick (X_user 683.8) vượt mặt phẳng DoorC1 nên DO56 bật ở Pick. Đã sửa: khoảng đệm `zone_door_margin = 20` mm
   sau mặt phẳng cửa. Theo yêu cầu: DO56 vẫn bật khi ở Pick (PLC tự xử lý), không loại trừ vùng Pick.
+
+## 17. Kết quả máy thật 2026-11-18
+
+* **Home từ vùng nguy hiểm → MoveL về Wait → cửa → Home: chạy đúng trên máy thật.** Giữ nguyên.
+* **P8 đảo tool (điểm mới + MoveL xuống Load_daotool): chạy đúng.** Giữ nguyên (đoạn lên vẫn MoveJ, blend 10).
+* Test song song 09:14 trong Simulation cho kết quả giống lần 09:00 (DO56 bật ở Pick và ở DoorC1) → nghi Sub-thread
+  vẫn dùng bản chưa có `zone_door_margin`, hoặc Simulation dùng tool khác tool "thanh". Từ nay dòng khởi động in
+  `ZONE MONITOR STARTED MARGIN 20 PICK Y 1187` để nhận biết phiên bản.

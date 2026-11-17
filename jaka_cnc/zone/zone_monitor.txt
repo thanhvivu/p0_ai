@@ -13,7 +13,7 @@ zone_y_pick_limit = 1187.165
 zone_odd_last = -1
 zone_even_last = -1
 zone_pick_last = -1
-log_message(1,"ZONE MONITOR STARTED")
+log_message(1,"ZONE MONITOR STARTED MARGIN 20 PICK Y 1187")
 while(1):
     zone_tcp = get_atl_tcp_pose()
     zone_odd = 0

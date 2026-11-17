@@ -35,7 +35,7 @@ mon=['# ZONE_MONITOR - run as Sub-thread1 from the main program. No motion comma
 '# DO56 = TCP past DoorC1 (odd CNC side), DO57 = past DoorC2 (even CNC side),',
 '# DO58 = TCP within 50 mm of the Pick point along Y_user or beyond it.',
 '# A DO is written only when its state changes, with a log line. Warning only, not safety.']+consts+[
-'log_message(1,"ZONE MONITOR STARTED")','while(1):']+['    '+x for x in check]+['    sleep(0.05)','end','']
+'log_message(1,"ZONE MONITOR STARTED MARGIN 20 PICK Y 1187")','while(1):']+['    '+x for x in check]+['    sleep(0.05)','end','']
 ok(mon); open(outdir+'/zone_monitor.txt','w',newline='').write('\r\n'.join(mon))
 # simulation copy for the parallel test: DO writes replaced by sleep, ON/OFF logs kept
 simmon=['# !!! SIMULATION ONLY !!! zone_monitor without DO writes; run as Sub-thread1 next to sim_test1_motion.']+[
