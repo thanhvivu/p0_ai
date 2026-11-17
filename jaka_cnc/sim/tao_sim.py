@@ -102,19 +102,28 @@ tests=[('p_c1_load_end',1,'C1LOADEND'),('p_c1_load',1,'C1LOAD'),('p_c1_load_wait
 ('p_unload_m2',2,'UNLOADM2'),('p_unload_m2_wait',2,'UNLOADM2_WAIT'),('p_air_c2',2,'AIRC2'),
 ('p_door_c1',1,'DOORC1'),('p_door_c2',2,'DOORC2'),
 ('p_c3_load',3,'C1LOAD PAIR CNC3 CNC4'),('p_c4_load_end',4,'ENDLOADM2V1 PAIR CNC3 CNC4'),
-('p_c5_unload',5,'C1UNLOAD PAIR CNC5 CNC6'),('p_c6_unload_wait',6,'UNLOADM2_WAIT PAIR CNC5 CNC6')]
+('p_c5_unload',5,'C1UNLOAD PAIR CNC5 CNC6'),('p_c6_unload_wait',6,'UNLOADM2_WAIT PAIR CNC5 CNC6'),
+('p_load_c2',2,'NONE - CNC2 DANGER LOAD TOOL ROUTE VIA LOADM2_WAIT','lift'),
+('p_unload_m2',2,'NONE - CNC2 DANGER UNLOAD TOOL ROUTE VIA UNLOADM2_WAIT','lift')]
 h=WARN+['# SIM TEST 2: DI90 Home recovery from each taught point.',
 '# For each test: MoveJ HomeLocation -> MoveJ straight to the test point (simulation only:',
 '# no obstacle check) -> run the unchanged DI90 Home block with AI16 = sim_ai16.',
 '# Compare "SIM EXPECT ..." with the next "HOME ACTUAL POSITION MATCH ..." log.','']+header+[
 '','log_message(1,"SIM HOME TEST START")','sim_ai16 = 0','sim_t = 1','sim_next = 0',
+'# 40 mm above a taught point: outside the 20 mm match window, still in front of the chuck',
+'sim_up = [0.0,0.0,40.0,0.0,0.0,0.0]',
 'while(sim_t > 0):',
 '    movj(p_home_location,0,speed_movej_fast,720,0)',
 '    home_route_door_done = 0','    home_already_home = 0','    home_route_hint = 0']
-for k,(p,ai,exp) in enumerate(tests,1):
+for k,t in enumerate(tests,1):
+    p,ai,exp=t[:3]
     h+=['    if(sim_t == %d):'%k,'        sim_ai16 = %d'%ai,
         '        log_message(1,"SIM TEST %d EXPECT MATCH %s AI16 %d")'%(k,exp,ai),
-        '        movj(%s,0,speed_movej_fast,720,0)'%p,'    end']
+        '        movj(%s,0,speed_movej_fast,720,0)'%p]
+    if len(t)>3:
+        h+=['        sim_pose = kine_forward(%s)'%p,'        sim_pose = pose_add(sim_pose,sim_up)',
+            '        movl(sim_pose,0,30,200,0)']
+    h+=['    end']
 h+=indent(stub(home),4)+['    sim_next = 0']
 for k in range(1,len(tests)):
     h+=['    if(sim_t == %d):'%k,'        sim_next = %d'%(k+1),'    end']

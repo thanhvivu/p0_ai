@@ -256,3 +256,17 @@ Khác code gốc: chỉ thêm các dòng `ACTIVE POINT SET CNC1 CNC2`.
 ## 13. Chạy thật trên máy (2026-11-17)
 
 * **Chu trình CNC1/CNC2 (P2) với `jamaguchi_cnc36.txt`: chạy được, đúng quy trình** (người vận hành xác nhận).
+
+## 14. Cập nhật 2026-11-17
+
+* **Điểm teach lại**: `p_c1_load`, `p_c1_load_wait`, `p_c1_load_end` (CNC1) và `p_load_m2_wait`, `p_load_c2`,
+  `p_end_load_m2v1` (CNC2). Điểm tạm CNC3/CNC5 chép theo CNC1 mới, CNC4/CNC6 chép theo CNC2 mới.
+* **Home từ máy chẵn (2/4/6)**: khi robot dừng lưng chừng trong vùng trước chuck (không khớp điểm teach nào),
+  trước đây MoveL thẳng ra DoorC2. Nay chọn theo J6:
+  * J6 gần hướng Tool Load (≈ +44°) → MoveL về **LoadM2_Wait** → DoorC2 → Home
+  * J6 gần hướng Tool Unload (≈ −135°) → MoveL về **UnloadM2_Wait** → DoorC2 → Home
+  * J6 hướng thổi khí (≈ −47°) → giữ như cũ: MoveL thẳng ra DoorC2 (ngược đường vào AirC2v1)
+  Ngưỡng là trung điểm giữa J6 các điểm đang dùng, tự theo điểm teach. Tốc độ lùi 30 mm/s.
+  Khi dừng **đúng** điểm teach (LoadC2, EndLoad, UnloadM2...) vẫn lùi theo đường cũ (đã qua Wait).
+  Máy lẻ (1/3/5) không đổi.
+* Test 2 thêm phép thử 19, 20 (robot cao hơn LoadC2 / UnloadM2 40 mm).

@@ -126,10 +126,10 @@ p_air_c1v1 = [-134.312, 136.943, 45.580, 177.004, -269.190, -44.856]
 p_air_c2 = [55.659,126.993,65.379,166.557,-258.042,-47.170]
 # AirC2v1 = taught joint point from CobotStudio screenshot
 p_air_c2v1 = [56.198,122.439,71.850,164.637,-257.503,-47.180]
-# Updated taught positions for CNC1 Load.
-p_c1_load = [-132.924,140.231,37.879,184.079,-267.412,44.142]
-p_c1_load_wait = [-138.586,143.111,32.339,186.740,-273.070,43.926]
-p_c1_load_end = [-132.738,140.167,38.001,184.021,-267.226,44.149]
+# Updated taught positions for CNC1 Load. - [CNC36] C1Load/C1LoadWait/C1LoadEnd re-taught 2026-11-17
+p_c1_load = [-132.988,139.466,40.442,180.730,-267.477,44.088]
+p_c1_load_wait = [-138.589,142.146,35.319,183.174,-273.078,44.026]
+p_c1_load_end = [-132.737,139.385,40.597,180.657,-267.226,44.091]
 
 # Process 2 Case 2 - Unload CNC1, J6 = original J6 + 180 degrees
 p_c1_unload_wait = [-138.163,142.907,33.696,184.325,-275.438,-135.035]
@@ -138,11 +138,11 @@ p_c1_unload = [-133.563,140.802,37.750,182.372,-270.839,-134.961]
 p_c1_unload_down = [-133.561,140.586,38.163,182.176,-270.837,-134.961]
 
 # Process 2 Case 3 - Load CNC2 (model 2 taught positions) - [CNC36] LoadM2_Wait/LoadC2/EndLoadM2v1 re-taught 2026-11
-p_load_m2_wait = [50.297,126.088,68.080,162.942,-264.499,44.244]
+p_load_m2_wait = [50.744,125.993,67.175,165.716,-263.002,44.342]
 # LoadC2: release Tool Load before entering EndLoadM2v1
-p_load_c2 = [56.457,125.684,68.753,162.625,-258.346,43.927]
+p_load_c2 = [57.020,125.664,67.718,165.480,-256.727,44.217]
 # EndLoadM2v1 - updated from the latest taught position.
-p_end_load_m2v1 = [56.822,125.691,68.739,162.628,-257.982,43.908]
+p_end_load_m2v1 = [57.278,125.673,67.702,165.486,-256.461,44.211]
 p_end_load_m2v2 = [57.088,126.289,65.170,169.400,-256.938,44.672]
 # EndLoadM2v1/v2 are retained for Home recognition only while Case 3 is simplified.
 # Relative Cartesian retreat after loading even-numbered CNC: X -20 mm in user frame
@@ -174,11 +174,11 @@ p_c3_air_v1 = [-134.312, 136.943, 45.580, 177.004, -269.190, -44.856]
 # copy of p_air_switch_tool
 p_c3_air_switch_tool = [-134.333,142.075,36.696,180.755,-269.211,-44.855]
 # copy of p_c1_load_wait
-p_c3_load_wait = [-138.586,143.111,32.339,186.740,-273.070,43.926]
+p_c3_load_wait = [-138.589,142.146,35.319,183.174,-273.078,44.026]
 # copy of p_c1_load
-p_c3_load = [-132.924,140.231,37.879,184.079,-267.412,44.142]
+p_c3_load = [-132.988,139.466,40.442,180.730,-267.477,44.088]
 # copy of p_c1_load_end
-p_c3_load_end = [-132.738,140.167,38.001,184.021,-267.226,44.149]
+p_c3_load_end = [-132.737,139.385,40.597,180.657,-267.226,44.091]
 # copy of p_c1_unload_wait
 p_c3_unload_wait = [-138.163,142.907,33.696,184.325,-275.438,-135.035]
 # copy of p_c1_unload
@@ -192,11 +192,11 @@ p_c4_air_v1 = [56.198,122.439,71.850,164.637,-257.503,-47.180]
 # copy of p_air_c2
 p_c4_air = [55.659,126.993,65.379,166.557,-258.042,-47.170]
 # copy of p_load_m2_wait
-p_c4_load_wait = [50.297,126.088,68.080,162.942,-264.499,44.244]
+p_c4_load_wait = [50.744,125.993,67.175,165.716,-263.002,44.342]
 # copy of p_load_c2
-p_c4_load = [56.457,125.684,68.753,162.625,-258.346,43.927]
+p_c4_load = [57.020,125.664,67.718,165.480,-256.727,44.217]
 # copy of p_end_load_m2v1
-p_c4_load_end = [56.822,125.691,68.739,162.628,-257.982,43.908]
+p_c4_load_end = [57.278,125.673,67.702,165.486,-256.461,44.211]
 # copy of p_unload_m2_wait
 p_c4_unload_wait = [51.507,126.321,64.645,170.483,-262.240,-135.484]
 # copy of p_unload_m2
@@ -208,11 +208,11 @@ p_c5_air_v1 = [-134.312, 136.943, 45.580, 177.004, -269.190, -44.856]
 # copy of p_air_switch_tool
 p_c5_air_switch_tool = [-134.333,142.075,36.696,180.755,-269.211,-44.855]
 # copy of p_c1_load_wait
-p_c5_load_wait = [-138.586,143.111,32.339,186.740,-273.070,43.926]
+p_c5_load_wait = [-138.589,142.146,35.319,183.174,-273.078,44.026]
 # copy of p_c1_load
-p_c5_load = [-132.924,140.231,37.879,184.079,-267.412,44.142]
+p_c5_load = [-132.988,139.466,40.442,180.730,-267.477,44.088]
 # copy of p_c1_load_end
-p_c5_load_end = [-132.738,140.167,38.001,184.021,-267.226,44.149]
+p_c5_load_end = [-132.737,139.385,40.597,180.657,-267.226,44.091]
 # copy of p_c1_unload_wait
 p_c5_unload_wait = [-138.163,142.907,33.696,184.325,-275.438,-135.035]
 # copy of p_c1_unload
@@ -226,11 +226,11 @@ p_c6_air_v1 = [56.198,122.439,71.850,164.637,-257.503,-47.180]
 # copy of p_air_c2
 p_c6_air = [55.659,126.993,65.379,166.557,-258.042,-47.170]
 # copy of p_load_m2_wait
-p_c6_load_wait = [50.297,126.088,68.080,162.942,-264.499,44.244]
+p_c6_load_wait = [50.744,125.993,67.175,165.716,-263.002,44.342]
 # copy of p_load_c2
-p_c6_load = [56.457,125.684,68.753,162.625,-258.346,43.927]
+p_c6_load = [57.020,125.664,67.718,165.480,-256.727,44.217]
 # copy of p_end_load_m2v1
-p_c6_load_end = [56.822,125.691,68.739,162.628,-257.982,43.908]
+p_c6_load_end = [57.278,125.673,67.702,165.486,-256.461,44.211]
 # copy of p_unload_m2_wait
 p_c6_unload_wait = [51.507,126.321,64.645,170.483,-262.240,-135.484]
 # copy of p_unload_m2
@@ -374,6 +374,8 @@ log_message(1,"SIM HOME TEST START")
 sim_ai16 = 0
 sim_t = 1
 sim_next = 0
+# 40 mm above a taught point: outside the 20 mm match window, still in front of the chuck
+sim_up = [0.0,0.0,40.0,0.0,0.0,0.0]
 while(sim_t > 0):
     movj(p_home_location,0,speed_movej_fast,720,0)
     home_route_door_done = 0
@@ -468,6 +470,22 @@ while(sim_t > 0):
         sim_ai16 = 6
         log_message(1,"SIM TEST 18 EXPECT MATCH UNLOADM2_WAIT PAIR CNC5 CNC6 AI16 6")
         movj(p_c6_unload_wait,0,speed_movej_fast,720,0)
+    end
+    if(sim_t == 19):
+        sim_ai16 = 2
+        log_message(1,"SIM TEST 19 EXPECT MATCH NONE - CNC2 DANGER LOAD TOOL ROUTE VIA LOADM2_WAIT AI16 2")
+        movj(p_load_c2,0,speed_movej_fast,720,0)
+        sim_pose = kine_forward(p_load_c2)
+        sim_pose = pose_add(sim_pose,sim_up)
+        movl(sim_pose,0,30,200,0)
+    end
+    if(sim_t == 20):
+        sim_ai16 = 2
+        log_message(1,"SIM TEST 20 EXPECT MATCH NONE - CNC2 DANGER UNLOAD TOOL ROUTE VIA UNLOADM2_WAIT AI16 2")
+        movj(p_unload_m2,0,speed_movej_fast,720,0)
+        sim_pose = kine_forward(p_unload_m2)
+        sim_pose = pose_add(sim_pose,sim_up)
+        movl(sim_pose,0,30,200,0)
     end
     home_actual_joint = get_atl_joint_pose()
     home_actual_tcp = get_atl_tcp_pose()
@@ -1169,30 +1187,60 @@ while(sim_t > 0):
         if(home_route_door_done == 0):
             if(home_c2_danger_side == 1):
             log_message(2,"HOME CNC2 DANGER SIDE DETECTED AFTER POINT CHECK")
-            door_c2_keep_j6_joint = get_atl_joint_pose()
-            door_c2_keep_j6_joint[0] = p_even_door[0]
-            door_c2_keep_j6_joint[1] = p_even_door[1]
-            door_c2_keep_j6_joint[2] = p_even_door[2]
-            door_c2_keep_j6_joint[3] = p_even_door[3]
-            door_c2_keep_j6_joint[4] = p_even_door[4]
-            door_c2_keep_j6_pose = kine_forward(door_c2_keep_j6_joint)
-            log_message(1,"HOME ROUTE MOVEL DOORC2 KEEP CURRENT J6")
-                movl(door_c2_keep_j6_pose,0,30,200,0)
-            log_message(1,"AT DOORC2 KEEP CURRENT J6 NO ROTATION")
-            home_route_door_done = 1
-            home_route_hint = 2
-            at_c1_load_wait = 0
-            at_c1_load = 0
-            at_c1_load_end = 0
-            at_c1_unload_wait = 0
-            at_c1_unload = 0
-            at_load_m2_wait = 0
-            at_load_m2 = 0
-            at_end_load_m2 = 0
-            at_unload_m2_wait = 0
-            at_unload_m2 = 0
-            at_air_c2 = 0
-                log_message(1,"HOME ROUTE DOORC2 COMPLETE")
+            # [CNC36] Even CNC (2/4/6): retreat to LoadM2_Wait or UnloadM2_Wait first, then DoorC2.
+            # The tool facing the chuck is identified by J6: Load ~ +44, Air ~ -47, Unload ~ -135.
+            # Thresholds are the midpoints between the active taught J6 values (no fixed numbers).
+            home_c2_wait_route = 0
+            if(home_actual_joint[5] >= (p_even_load_wait[5] + p_even_air[5]) * 0.5):
+                home_c2_wait_route = 1
+            end
+            if(home_actual_joint[5] <= (p_even_unload_wait[5] + p_even_air[5]) * 0.5):
+                home_c2_wait_route = 2
+            end
+            if(home_c2_wait_route == 1):
+                log_message(1,"HOME CNC2 DANGER LOAD TOOL MOVEL LOADM2_WAIT START")
+                p_load_m2_wait_pose = kine_forward(p_even_load_wait)
+                p_load_m2_wait_pose = pose_add(p_load_m2_wait_pose,p_even_user_x_offset)
+                movl(p_load_m2_wait_pose,0,30,200,0)
+                at_load_m2_wait = 1
+                home_route_hint = 2
+                log_message(1,"HOME ROUTE LOADM2_WAIT COMPLETE")
+            end
+            if(home_c2_wait_route == 2):
+                log_message(1,"HOME CNC2 DANGER UNLOAD TOOL MOVEL UNLOADM2_WAIT START")
+                p_unload_m2_wait_pose = kine_forward(p_even_unload_wait)
+                movl(p_unload_m2_wait_pose,0,30,200,0)
+                at_unload_m2_wait = 1
+                home_route_hint = 2
+                log_message(1,"HOME ROUTE UNLOADM2_WAIT COMPLETE")
+            end
+            # Air-blow orientation (J6 ~ -47): unchanged, straight MoveL to DoorC2 keeping J6.
+            if(home_c2_wait_route == 0):
+                door_c2_keep_j6_joint = get_atl_joint_pose()
+                door_c2_keep_j6_joint[0] = p_even_door[0]
+                door_c2_keep_j6_joint[1] = p_even_door[1]
+                door_c2_keep_j6_joint[2] = p_even_door[2]
+                door_c2_keep_j6_joint[3] = p_even_door[3]
+                door_c2_keep_j6_joint[4] = p_even_door[4]
+                door_c2_keep_j6_pose = kine_forward(door_c2_keep_j6_joint)
+                log_message(1,"HOME ROUTE MOVEL DOORC2 KEEP CURRENT J6")
+                    movl(door_c2_keep_j6_pose,0,30,200,0)
+                log_message(1,"AT DOORC2 KEEP CURRENT J6 NO ROTATION")
+                home_route_door_done = 1
+                home_route_hint = 2
+                at_c1_load_wait = 0
+                at_c1_load = 0
+                at_c1_load_end = 0
+                at_c1_unload_wait = 0
+                at_c1_unload = 0
+                at_load_m2_wait = 0
+                at_load_m2 = 0
+                at_end_load_m2 = 0
+                at_unload_m2_wait = 0
+                at_unload_m2 = 0
+                at_air_c2 = 0
+                    log_message(1,"HOME ROUTE DOORC2 COMPLETE")
+            end
             end
         end
     end
@@ -1500,6 +1548,12 @@ while(sim_t > 0):
     end
     if(sim_t == 17):
         sim_next = 18
+    end
+    if(sim_t == 18):
+        sim_next = 19
+    end
+    if(sim_t == 19):
+        sim_next = 20
     end
     sim_t = sim_next
 end
