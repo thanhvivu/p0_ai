@@ -311,3 +311,15 @@ Khác code gốc: chỉ thêm các dòng `ACTIVE POINT SET CNC1 CNC2`.
 * Test song song 09:14 trong Simulation cho kết quả giống lần 09:00 (DO56 bật ở Pick và ở DoorC1) → nghi Sub-thread
   vẫn dùng bản chưa có `zone_door_margin`, hoặc Simulation dùng tool khác tool "thanh". Từ nay dòng khởi động in
   `ZONE MONITOR STARTED MARGIN 20 PICK Y 1187` để nhận biết phiên bản.
+
+## 18. Chốt zone_monitor (2026-11-18)
+
+* Dùng **`zone/zone_monitor.txt`** (so sánh X/Y bằng công thức đổi Base → usrfr_thanh), không dùng
+  `set_user_frame_id` / `set_tool_id` (theo tài liệu JAKA, hai lệnh này đổi thiết lập chung của cả robot,
+  sẽ ảnh hưởng chương trình chính). Bản userframe đã xóa.
+* Test thực tế ngày 2026-11-19, checklist:
+  1. Khung kéo thả: Run Program Sub-thread1 → `check_workzone` (dán `zone_monitor.txt`), rồi Sub chính `jamaguchi_cnc36`.
+  2. Log khởi động phải có `ZONE MONITOR STARTED MARGIN 20 PICK Y 1187`.
+  3. Ghi lại tool / user frame đang chọn khi chạy (ngưỡng đo với tool "thanh").
+  4. Quan sát DO56/57/58 trên màn hình IO: đứng ở cửa → OFF; vào CNC lẻ → DO56 ON; CNC chẵn → DO57 ON; Pick → DO58 ON.
+  5. Chỉnh `zone_door_margin` nếu bit bật quá sớm/muộn quanh cửa.
