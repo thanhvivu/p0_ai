@@ -1,0 +1,75 @@
+# !!! SIMULATION ONLY !!! Simplest main program for the parallel zone test (no IO).
+# Layout: Run Program Sub-thread1 = check_workzone (sim_zone_monitor.txt), then Sub = this program.
+# Expected monitor logs: DO58 ON near PICK, DO56 ON inside CNC1 past DoorC1, DO57 ON inside CNC2
+# past DoorC2, each OFF again on the way back. They must appear WHILE the robot is moving.
+
+p_home_location = [-43.100,56.711,106.885,194.140,-264.961,48.660]
+p_pick_true_axis = [-62.562,148.695,10.785,199.567,-197.644,-45.829]
+p_pick = [-62.566,144.864,23.441,190.741,-197.648,-45.829]
+p_door_c1 = [-126.687,83.807,112.098,163.645,-261.426,-44.917]
+p_c1_load_wait = [-138.586,142.271,35.057,183.311,-273.075,44.026]
+p_c1_load = [-132.986,139.577,40.211,180.850,-267.475,44.088]
+p_door_c2 = [82.806,67.797,128.293,165.476,-230.174,-49.001]
+p_load_m2_wait = [50.754,126.156,66.822,165.907,-262.992,44.342]
+p_load_c2 = [56.882,125.825,67.368,165.670,-256.865,44.220]
+
+log_message(1,"SIM MAIN START")
+log_message(1,"SIM MAIN MOVEJ HOMELOCATION START")
+movj(p_home_location,0,40,720,0)
+log_message(1,"SIM MAIN AT HOMELOCATION")
+log_message(1,"SIM MAIN MOVEJ PICKWAIT START")
+movj(p_pick_true_axis,0,40,720,0)
+log_message(1,"SIM MAIN AT PICKWAIT")
+log_message(1,"SIM MAIN MOVEL PICK START")
+sim_pose = kine_forward(p_pick)
+movl(sim_pose,0,50,200,0)
+log_message(1,"SIM MAIN AT PICK")
+log_message(1,"SIM MAIN MOVEL PICKWAIT START")
+sim_pose = kine_forward(p_pick_true_axis)
+movl(sim_pose,0,50,200,0)
+log_message(1,"SIM MAIN AT PICKWAIT")
+log_message(1,"SIM MAIN MOVEJ HOMELOCATION START")
+movj(p_home_location,0,40,720,0)
+log_message(1,"SIM MAIN AT HOMELOCATION")
+log_message(1,"SIM MAIN MOVEJ DOORC1 START")
+movj(p_door_c1,0,40,720,0)
+log_message(1,"SIM MAIN AT DOORC1")
+log_message(1,"SIM MAIN MOVEJ C1LOADWAIT START")
+movj(p_c1_load_wait,0,40,720,0)
+log_message(1,"SIM MAIN AT C1LOADWAIT")
+log_message(1,"SIM MAIN MOVEL C1LOAD START")
+sim_pose = kine_forward(p_c1_load)
+movl(sim_pose,0,50,200,0)
+log_message(1,"SIM MAIN AT C1LOAD")
+log_message(1,"SIM MAIN MOVEL C1LOADWAIT START")
+sim_pose = kine_forward(p_c1_load_wait)
+movl(sim_pose,0,50,200,0)
+log_message(1,"SIM MAIN AT C1LOADWAIT")
+log_message(1,"SIM MAIN MOVEJ DOORC1 START")
+movj(p_door_c1,0,40,720,0)
+log_message(1,"SIM MAIN AT DOORC1")
+log_message(1,"SIM MAIN MOVEJ HOMELOCATION START")
+movj(p_home_location,0,40,720,0)
+log_message(1,"SIM MAIN AT HOMELOCATION")
+log_message(1,"SIM MAIN MOVEJ DOORC2 START")
+movj(p_door_c2,0,40,720,0)
+log_message(1,"SIM MAIN AT DOORC2")
+log_message(1,"SIM MAIN MOVEJ LOADM2_WAIT START")
+movj(p_load_m2_wait,0,40,720,0)
+log_message(1,"SIM MAIN AT LOADM2_WAIT")
+log_message(1,"SIM MAIN MOVEL LOADC2 START")
+sim_pose = kine_forward(p_load_c2)
+movl(sim_pose,0,50,200,0)
+log_message(1,"SIM MAIN AT LOADC2")
+log_message(1,"SIM MAIN MOVEL LOADM2_WAIT START")
+sim_pose = kine_forward(p_load_m2_wait)
+movl(sim_pose,0,50,200,0)
+log_message(1,"SIM MAIN AT LOADM2_WAIT")
+log_message(1,"SIM MAIN MOVEJ DOORC2 START")
+movj(p_door_c2,0,40,720,0)
+log_message(1,"SIM MAIN AT DOORC2")
+log_message(1,"SIM MAIN MOVEJ HOMELOCATION START")
+movj(p_home_location,0,40,720,0)
+log_message(1,"SIM MAIN AT HOMELOCATION")
+sleep(1)
+log_message(1,"SIM MAIN END")
