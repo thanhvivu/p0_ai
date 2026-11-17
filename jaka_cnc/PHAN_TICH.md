@@ -302,4 +302,4 @@ Khác code gốc: chỉ thêm các dòng `ACTIVE POINT SET CNC1 CNC2`.
 * Test song song trong Simulation 2026-11-18 09:00 (`sim_main_simple` + `sim_zone_monitor`): **luồng phụ chạy song song đúng**,
   bit đổi trong lúc robot đang di chuyển. Phát hiện: robot đứng ở Door đã bị tính là trong máy (ngưỡng = đúng X cửa),
   và Pick (X_user 683.8) vượt mặt phẳng DoorC1 nên DO56 bật ở Pick. Đã sửa: khoảng đệm `zone_door_margin = 20` mm
-  sau mặt phẳng cửa; DO56 chỉ bật khi Y_user ≤ 1187.165 (không ở vùng Pick).
+  sau mặt phẳng cửa. Theo yêu cầu: DO56 vẫn bật khi ở Pick (PLC tự xử lý), không loại trừ vùng Pick.
