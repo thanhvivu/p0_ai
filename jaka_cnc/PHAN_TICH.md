@@ -270,3 +270,18 @@ Khác code gốc: chỉ thêm các dòng `ACTIVE POINT SET CNC1 CNC2`.
   Khi dừng **đúng** điểm teach (LoadC2, EndLoad, UnloadM2...) vẫn lùi theo đường cũ (đã qua Wait).
   Máy lẻ (1/3/5) không đổi.
 * Test 2 thêm phép thử 19, 20 (robot cao hơn LoadC2 / UnloadM2 40 mm).
+
+## 15. Home từ vùng nguy hiểm: luôn MoveL về điểm Wait rồi mới ra cửa (cả máy lẻ và chẵn)
+
+Áp dụng khi robot ở trong vùng nguy hiểm CNC lẻ (`home_c1_danger_side = 1`) hoặc CNC chẵn
+(`home_c2_danger_side = 1`) và **không khớp điểm teach nào**. Chọn điểm Wait theo J6 (tool đang hướng vào chuck):
+
+| J6 | Máy lẻ 1/3/5 | Máy chẵn 2/4/6 |
+|---|---|---|
+| Hướng Tool Load (≈ +44°) | MoveL → C1LoadWait → DoorC1 → Home | MoveL → LoadM2_Wait → DoorC2 → Home |
+| Hướng Tool Unload (≈ −135°) | MoveL → C1UnloadWait → DoorC1 → Home | MoveL → UnloadM2_Wait → DoorC2 → Home |
+| Hướng thổi khí (≈ −45°) | MoveL → AirC1v1 → DoorC1 → Home | MoveL → AirC2v1 → DoorC2 → Home |
+
+* Ngưỡng = trung điểm J6 giữa các điểm đang dùng (tự theo điểm teach). MoveL lùi ở 30 mm/s.
+* Khi khớp điểm AirC2 (đã có trong danh sách nhận diện): nay cũng lùi AirC2 → AirC2v1 → DoorC2.
+* Test 2 thêm phép thử 21–24 (CNC1 load/unload nâng 40 mm, AirSwitchTool, AirC2v1).

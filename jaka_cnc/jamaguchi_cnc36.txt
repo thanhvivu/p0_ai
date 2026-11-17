@@ -1324,30 +1324,64 @@ while(1):
                 if(home_match_valid == 0):
                     if(home_c1_danger_side == 1):
                         log_message(2,"HOME CNC1 DANGER SIDE DETECTED AFTER POINT CHECK")
-                        door_c1_keep_j6_joint = get_atl_joint_pose()
-                        door_c1_keep_j6_joint[0] = p_odd_door[0]
-                        door_c1_keep_j6_joint[1] = p_odd_door[1]
-                        door_c1_keep_j6_joint[2] = p_odd_door[2]
-                        door_c1_keep_j6_joint[3] = p_odd_door[3]
-                        door_c1_keep_j6_joint[4] = p_odd_door[4]
-                        door_c1_keep_j6_pose = kine_forward(door_c1_keep_j6_joint)
-                        log_message(1,"HOME ROUTE MOVEL DOORC1 KEEP CURRENT J6")
-                            movl(door_c1_keep_j6_pose,0,30,200,0)
-                        log_message(1,"AT DOORC1 KEEP CURRENT J6 NO ROTATION")
-                        home_route_door_done = 1
-                        home_route_hint = 1
-                        at_c1_load_wait = 0
-                        at_c1_load = 0
-                        at_c1_load_end = 0
-                        at_c1_unload_wait = 0
-                        at_c1_unload = 0
-                        at_load_m2_wait = 0
-                        at_load_m2 = 0
-                        at_end_load_m2 = 0
-                        at_unload_m2_wait = 0
-                        at_unload_m2 = 0
-                        at_air_c2 = 0
-                        log_message(1,"HOME ROUTE DOORC1 COMPLETE")
+                        # [CNC36] Danger side: retreat by MoveL to the Wait point of the tool facing the chuck,
+                        # then to the Door. Tool identified by J6 (Load ~ +44, Air ~ -45, Unload ~ -135);
+                        # thresholds are midpoints of the active taught J6 values. Speed 30 mm/s.
+                        home_c1_wait_route = 0
+                        if(home_actual_joint[5] >= (p_odd_load_wait[5] + p_odd_air_v1[5]) * 0.5):
+                            home_c1_wait_route = 1
+                        end
+                        if(home_actual_joint[5] <= (p_odd_unload_wait[5] + p_odd_air_v1[5]) * 0.5):
+                            home_c1_wait_route = 2
+                        end
+                        if(home_c1_wait_route == 1):
+                            log_message(1,"HOME CNC1 DANGER LOAD TOOL MOVEL C1LOADWAIT START")
+                            home_wait_pose = kine_forward(p_odd_load_wait)
+                            home_wait_pose = pose_add(home_wait_pose,p_odd_user_x_offset)
+                            movl(home_wait_pose,0,30,200,0)
+                            at_c1_load_wait = 1
+                            home_route_hint = 1
+                            log_message(1,"HOME ROUTE C1LOADWAIT COMPLETE")
+                        end
+                        if(home_c1_wait_route == 2):
+                            log_message(1,"HOME CNC1 DANGER UNLOAD TOOL MOVEL C1UNLOADWAIT START")
+                            home_wait_pose = kine_forward(p_odd_unload_wait)
+                            movl(home_wait_pose,0,30,200,0)
+                            at_c1_unload_wait = 1
+                            home_route_hint = 1
+                            log_message(1,"HOME ROUTE C1UNLOADWAIT COMPLETE")
+                        end
+                        # Air-blow orientation: back to the air entry point (the air Wait), then straight to the Door.
+                        if(home_c1_wait_route == 0):
+                            log_message(1,"HOME CNC1 DANGER AIR TOOL MOVEL AIRC1V1 START")
+                            home_wait_pose = kine_forward(p_odd_air_v1)
+                            movl(home_wait_pose,0,30,200,0)
+                            log_message(1,"HOME ROUTE AIRC1V1 COMPLETE")
+                            door_c1_keep_j6_joint = get_atl_joint_pose()
+                            door_c1_keep_j6_joint[0] = p_odd_door[0]
+                            door_c1_keep_j6_joint[1] = p_odd_door[1]
+                            door_c1_keep_j6_joint[2] = p_odd_door[2]
+                            door_c1_keep_j6_joint[3] = p_odd_door[3]
+                            door_c1_keep_j6_joint[4] = p_odd_door[4]
+                            door_c1_keep_j6_pose = kine_forward(door_c1_keep_j6_joint)
+                            log_message(1,"HOME ROUTE MOVEL DOORC1 KEEP CURRENT J6")
+                                movl(door_c1_keep_j6_pose,0,30,200,0)
+                            log_message(1,"AT DOORC1 KEEP CURRENT J6 NO ROTATION")
+                            home_route_door_done = 1
+                            home_route_hint = 1
+                            at_c1_load_wait = 0
+                            at_c1_load = 0
+                            at_c1_load_end = 0
+                            at_c1_unload_wait = 0
+                            at_c1_unload = 0
+                            at_load_m2_wait = 0
+                            at_load_m2 = 0
+                            at_end_load_m2 = 0
+                            at_unload_m2_wait = 0
+                            at_unload_m2 = 0
+                            at_air_c2 = 0
+                            log_message(1,"HOME ROUTE DOORC1 COMPLETE")
+                        end
                     end
                 end
                 if(home_match_valid == 0):
@@ -1357,35 +1391,39 @@ while(1):
                     if(home_route_door_done == 0):
                         if(home_c2_danger_side == 1):
                         log_message(2,"HOME CNC2 DANGER SIDE DETECTED AFTER POINT CHECK")
-                        # [CNC36] Even CNC (2/4/6): retreat to LoadM2_Wait or UnloadM2_Wait first, then DoorC2.
-                        # The tool facing the chuck is identified by J6: Load ~ +44, Air ~ -47, Unload ~ -135.
-                        # Thresholds are the midpoints between the active taught J6 values (no fixed numbers).
+                        # [CNC36] Danger side: retreat by MoveL to the Wait point of the tool facing the chuck,
+                        # then to the Door. Tool identified by J6 (Load ~ +44, Air ~ -45, Unload ~ -135);
+                        # thresholds are midpoints of the active taught J6 values. Speed 30 mm/s.
                         home_c2_wait_route = 0
-                        if(home_actual_joint[5] >= (p_even_load_wait[5] + p_even_air[5]) * 0.5):
+                        if(home_actual_joint[5] >= (p_even_load_wait[5] + p_even_air_v1[5]) * 0.5):
                             home_c2_wait_route = 1
                         end
-                        if(home_actual_joint[5] <= (p_even_unload_wait[5] + p_even_air[5]) * 0.5):
+                        if(home_actual_joint[5] <= (p_even_unload_wait[5] + p_even_air_v1[5]) * 0.5):
                             home_c2_wait_route = 2
                         end
                         if(home_c2_wait_route == 1):
                             log_message(1,"HOME CNC2 DANGER LOAD TOOL MOVEL LOADM2_WAIT START")
-                            p_load_m2_wait_pose = kine_forward(p_even_load_wait)
-                            p_load_m2_wait_pose = pose_add(p_load_m2_wait_pose,p_even_user_x_offset)
-                            movl(p_load_m2_wait_pose,0,30,200,0)
+                            home_wait_pose = kine_forward(p_even_load_wait)
+                            home_wait_pose = pose_add(home_wait_pose,p_even_user_x_offset)
+                            movl(home_wait_pose,0,30,200,0)
                             at_load_m2_wait = 1
                             home_route_hint = 2
                             log_message(1,"HOME ROUTE LOADM2_WAIT COMPLETE")
                         end
                         if(home_c2_wait_route == 2):
                             log_message(1,"HOME CNC2 DANGER UNLOAD TOOL MOVEL UNLOADM2_WAIT START")
-                            p_unload_m2_wait_pose = kine_forward(p_even_unload_wait)
-                            movl(p_unload_m2_wait_pose,0,30,200,0)
+                            home_wait_pose = kine_forward(p_even_unload_wait)
+                            movl(home_wait_pose,0,30,200,0)
                             at_unload_m2_wait = 1
                             home_route_hint = 2
                             log_message(1,"HOME ROUTE UNLOADM2_WAIT COMPLETE")
                         end
-                        # Air-blow orientation (J6 ~ -47): unchanged, straight MoveL to DoorC2 keeping J6.
+                        # Air-blow orientation: back to the air entry point (the air Wait), then straight to the Door.
                         if(home_c2_wait_route == 0):
+                            log_message(1,"HOME CNC2 DANGER AIR TOOL MOVEL AIRC2V1 START")
+                            home_wait_pose = kine_forward(p_even_air_v1)
+                            movl(home_wait_pose,0,30,200,0)
+                            log_message(1,"HOME ROUTE AIRC2V1 COMPLETE")
                             door_c2_keep_j6_joint = get_atl_joint_pose()
                             door_c2_keep_j6_joint[0] = p_even_door[0]
                             door_c2_keep_j6_joint[1] = p_even_door[1]
@@ -1551,6 +1589,11 @@ while(1):
                 end
                 if(at_air_c2 == 1):
                     log_message(1,"HOME ROUTE CURRENT AT AIRC2")
+                    # [CNC36] Retreat AirC2 -> AirC2v1 (reverse of the entry path) before DoorC2.
+                    log_message(1,"HOME ROUTE MOVEL AIRC2V1 START")
+                    home_wait_pose = kine_forward(p_even_air_v1)
+                    movl(home_wait_pose,0,30,200,0)
+                    log_message(1,"HOME ROUTE AIRC2V1 COMPLETE")
                     log_message(1,"HOME ROUTE MOVEJ DOORC2 START")
                     door_c2_keep_j6_joint = get_atl_joint_pose()
                     door_c2_keep_j6_joint[0] = p_even_door[0]

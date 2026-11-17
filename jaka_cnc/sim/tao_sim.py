@@ -104,7 +104,11 @@ tests=[('p_c1_load_end',1,'C1LOADEND'),('p_c1_load',1,'C1LOAD'),('p_c1_load_wait
 ('p_c3_load',3,'C1LOAD PAIR CNC3 CNC4'),('p_c4_load_end',4,'ENDLOADM2V1 PAIR CNC3 CNC4'),
 ('p_c5_unload',5,'C1UNLOAD PAIR CNC5 CNC6'),('p_c6_unload_wait',6,'UNLOADM2_WAIT PAIR CNC5 CNC6'),
 ('p_load_c2',2,'NONE - CNC2 DANGER LOAD TOOL ROUTE VIA LOADM2_WAIT','lift'),
-('p_unload_m2',2,'NONE - CNC2 DANGER UNLOAD TOOL ROUTE VIA UNLOADM2_WAIT','lift')]
+('p_unload_m2',2,'NONE - CNC2 DANGER UNLOAD TOOL ROUTE VIA UNLOADM2_WAIT','lift'),
+('p_c1_load',1,'NONE - CNC1 DANGER LOAD TOOL ROUTE VIA C1LOADWAIT','lift'),
+('p_c1_unload',1,'NONE - CNC1 DANGER UNLOAD TOOL ROUTE VIA C1UNLOADWAIT','lift'),
+('p_air_switch_tool',1,'NONE - CNC1 DANGER AIR TOOL ROUTE VIA AIRC1V1'),
+('p_air_c2v1',2,'NONE - CNC2 DANGER AIR TOOL ROUTE VIA AIRC2V1')]
 h=WARN+['# SIM TEST 2: DI90 Home recovery from each taught point.',
 '# For each test: MoveJ HomeLocation -> MoveJ straight to the test point (simulation only:',
 '# no obstacle check) -> run the unchanged DI90 Home block with AI16 = sim_ai16.',
