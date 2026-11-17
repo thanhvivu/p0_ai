@@ -83,6 +83,24 @@ blk=hdr+init+['']+check+['']
 check_ok(init,'init'); check_ok(check,'check')
 open(outdir+'/zone_check.txt','w',newline='').write('\r\n'.join(blk))
 
+# ---- standalone sub-thread program: own copies of the points it needs + INIT + endless CALL loop ----
+L0=open(main_src).read().replace('\r','').split('\n')
+def pt(name):
+    for x in L0:
+        if re.match(r'^%s\s*='%name,x): return x.strip()
+    raise Exception(name)
+mon=['# ===================================================================',
+'# ZONE_MONITOR - run as SUB-THREAD from the main program (Run Program: Sub-thread1).',
+'# Runs in parallel with the main program, also while the robot is moving.',
+'# Only reads the TCP and writes DO56/DO57/DO58; no motion commands.',
+'# Copy of the points it needs - keep equal to the main program after re-teaching:',
+'# ===================================================================',
+pt('p_pick'), pt('p_home_location'),'']+init+['',
+'log_message(1,"ZONE MONITOR STARTED")',
+'while(1):']+['    '+x if x.strip() else x for x in check]+['    sleep(0.05)','end','']
+check_ok(mon,'mon')
+open(outdir+'/zone_monitor.txt','w',newline='').write('\r\n'.join(mon))
+
 # ---- simulation test: header of main program + init + visit points + call ----
 L=open(main_src).read().replace('\r','').split('\n')
 he=[i for i,l in enumerate(L) if l.startswith('# Reset common and Process interlock outputs')][0]
