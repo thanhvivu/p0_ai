@@ -285,3 +285,12 @@ Khác code gốc: chỉ thêm các dòng `ACTIVE POINT SET CNC1 CNC2`.
 * Ngưỡng = trung điểm J6 giữa các điểm đang dùng (tự theo điểm teach). MoveL lùi ở 30 mm/s.
 * Khi khớp điểm AirC2 (đã có trong danh sách nhận diện): nay cũng lùi AirC2 → AirC2v1 → DoorC2.
 * Test 2 thêm phép thử 21–24 (CNC1 load/unload nâng 40 mm, AirSwitchTool, AirC2v1).
+
+## 16. Zone monitor (DO56/DO57/DO58) – `zone/zone_monitor.txt`
+
+* Chạy dạng **Sub-thread** (khối Run Program → Sub-thread1) song song với chương trình chính, cập nhật cả khi robot đang chạy.
+* DO56: X_user > 679.362 (qua DoorC1, phía máy lẻ). DO57: X_user < −365.358 (qua DoorC2, phía máy chẵn).
+  DO58: Y_user > 1187.165 (= Y Pick 1237.165 − 50). Ghi DO khi đổi trạng thái, kèm log ON/OFF.
+* Đã xác nhận: tọa độ màn hình teach là hệ user `usrfr_thanh`; robot chỉ ra Pick khi trục ở vị trí CNC1/2
+  nên DO58 có nghĩa đúng.
+* Còn chờ: cú pháp script của khối Run Program Sub-thread; PLC map DO56–DO58.
