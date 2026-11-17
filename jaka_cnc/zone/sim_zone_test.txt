@@ -365,6 +365,8 @@ p_home_location_max = [-38.100,61.711,111.885,199.140,-259.961,53.660]
 # DoorC1 / DoorC2 X from the danger-boundary references in the main program.
 zone_x_door1 = 679.362
 zone_x_door2 = -365.358
+# Margin past the Door plane: the robot standing at a Door is NOT counted inside the CNC.
+zone_door_margin = 20.0
 # Pick point TCP in usrfr_thanh = [683.786,1237.165,330.754]; limit = Y_pick - 50 mm.
 zone_y_pick_limit = 1187.165
 zone_odd_last = -1
@@ -374,12 +376,15 @@ log_message(1,"SIM ZONE TEST START")
 log_message(1,"SIM ZONE 1 AT HOMELOCATION EXPECT ALL OFF")
 movj(p_home_location,0,speed_movej_fast,720,0)
 zone_tcp = get_atl_tcp_pose()
+# DO56: past DoorC1 + margin, and not in the Pick zone (Pick lies on the odd row beyond DoorC1 X).
 zone_odd = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
-    zone_odd = 1
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1 + zone_door_margin):
+    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) <= zone_y_pick_limit):
+        zone_odd = 1
+    end
 end
 zone_even = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2):
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2 - zone_door_margin):
     zone_even = 1
 end
 zone_pick = 0
@@ -431,12 +436,15 @@ zone_pick_last = zone_pick
 log_message(1,"SIM ZONE 2 AT PICKWAIT EXPECT DO58 ON IF WITHIN 50 MM")
 movj(p_pick_true_axis,0,speed_movej_fast,720,0)
 zone_tcp = get_atl_tcp_pose()
+# DO56: past DoorC1 + margin, and not in the Pick zone (Pick lies on the odd row beyond DoorC1 X).
 zone_odd = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
-    zone_odd = 1
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1 + zone_door_margin):
+    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) <= zone_y_pick_limit):
+        zone_odd = 1
+    end
 end
 zone_even = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2):
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2 - zone_door_margin):
     zone_even = 1
 end
 zone_pick = 0
@@ -488,12 +496,15 @@ zone_pick_last = zone_pick
 log_message(1,"SIM ZONE 3 AT PICK EXPECT DO58 ON")
 movj(p_pick,0,speed_movej_fast,720,0)
 zone_tcp = get_atl_tcp_pose()
+# DO56: past DoorC1 + margin, and not in the Pick zone (Pick lies on the odd row beyond DoorC1 X).
 zone_odd = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
-    zone_odd = 1
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1 + zone_door_margin):
+    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) <= zone_y_pick_limit):
+        zone_odd = 1
+    end
 end
 zone_even = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2):
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2 - zone_door_margin):
     zone_even = 1
 end
 zone_pick = 0
@@ -545,12 +556,15 @@ zone_pick_last = zone_pick
 log_message(1,"SIM ZONE 4 AT HOMELOCATION EXPECT DO58 OFF")
 movj(p_home_location,0,speed_movej_fast,720,0)
 zone_tcp = get_atl_tcp_pose()
+# DO56: past DoorC1 + margin, and not in the Pick zone (Pick lies on the odd row beyond DoorC1 X).
 zone_odd = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
-    zone_odd = 1
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1 + zone_door_margin):
+    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) <= zone_y_pick_limit):
+        zone_odd = 1
+    end
 end
 zone_even = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2):
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2 - zone_door_margin):
     zone_even = 1
 end
 zone_pick = 0
@@ -602,12 +616,15 @@ zone_pick_last = zone_pick
 log_message(1,"SIM ZONE 5 AT DOORC1 EXPECT ON BOUNDARY")
 movj(p_door_c1,0,speed_movej_fast,720,0)
 zone_tcp = get_atl_tcp_pose()
+# DO56: past DoorC1 + margin, and not in the Pick zone (Pick lies on the odd row beyond DoorC1 X).
 zone_odd = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
-    zone_odd = 1
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1 + zone_door_margin):
+    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) <= zone_y_pick_limit):
+        zone_odd = 1
+    end
 end
 zone_even = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2):
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2 - zone_door_margin):
     zone_even = 1
 end
 zone_pick = 0
@@ -659,12 +676,15 @@ zone_pick_last = zone_pick
 log_message(1,"SIM ZONE 6 AT C1LOADWAIT EXPECT DO56 ON")
 movj(p_odd_load_wait,0,speed_movej_fast,720,0)
 zone_tcp = get_atl_tcp_pose()
+# DO56: past DoorC1 + margin, and not in the Pick zone (Pick lies on the odd row beyond DoorC1 X).
 zone_odd = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
-    zone_odd = 1
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1 + zone_door_margin):
+    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) <= zone_y_pick_limit):
+        zone_odd = 1
+    end
 end
 zone_even = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2):
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2 - zone_door_margin):
     zone_even = 1
 end
 zone_pick = 0
@@ -716,12 +736,15 @@ zone_pick_last = zone_pick
 log_message(1,"SIM ZONE 7 AT C1LOAD EXPECT DO56 ON")
 movj(p_odd_load,0,speed_movej_fast,720,0)
 zone_tcp = get_atl_tcp_pose()
+# DO56: past DoorC1 + margin, and not in the Pick zone (Pick lies on the odd row beyond DoorC1 X).
 zone_odd = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
-    zone_odd = 1
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1 + zone_door_margin):
+    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) <= zone_y_pick_limit):
+        zone_odd = 1
+    end
 end
 zone_even = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2):
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2 - zone_door_margin):
     zone_even = 1
 end
 zone_pick = 0
@@ -773,12 +796,15 @@ zone_pick_last = zone_pick
 log_message(1,"SIM ZONE 8 AT DOORC1 EXPECT ON BOUNDARY")
 movj(p_door_c1,0,speed_movej_fast,720,0)
 zone_tcp = get_atl_tcp_pose()
+# DO56: past DoorC1 + margin, and not in the Pick zone (Pick lies on the odd row beyond DoorC1 X).
 zone_odd = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
-    zone_odd = 1
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1 + zone_door_margin):
+    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) <= zone_y_pick_limit):
+        zone_odd = 1
+    end
 end
 zone_even = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2):
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2 - zone_door_margin):
     zone_even = 1
 end
 zone_pick = 0
@@ -830,12 +856,15 @@ zone_pick_last = zone_pick
 log_message(1,"SIM ZONE 9 AT DOORC2 EXPECT ON BOUNDARY")
 movj(p_door_c2,0,speed_movej_fast,720,0)
 zone_tcp = get_atl_tcp_pose()
+# DO56: past DoorC1 + margin, and not in the Pick zone (Pick lies on the odd row beyond DoorC1 X).
 zone_odd = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
-    zone_odd = 1
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1 + zone_door_margin):
+    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) <= zone_y_pick_limit):
+        zone_odd = 1
+    end
 end
 zone_even = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2):
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2 - zone_door_margin):
     zone_even = 1
 end
 zone_pick = 0
@@ -887,12 +916,15 @@ zone_pick_last = zone_pick
 log_message(1,"SIM ZONE 10 AT LOADM2_WAIT EXPECT DO57 ON")
 movj(p_even_load_wait,0,speed_movej_fast,720,0)
 zone_tcp = get_atl_tcp_pose()
+# DO56: past DoorC1 + margin, and not in the Pick zone (Pick lies on the odd row beyond DoorC1 X).
 zone_odd = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
-    zone_odd = 1
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1 + zone_door_margin):
+    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) <= zone_y_pick_limit):
+        zone_odd = 1
+    end
 end
 zone_even = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2):
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2 - zone_door_margin):
     zone_even = 1
 end
 zone_pick = 0
@@ -944,12 +976,15 @@ zone_pick_last = zone_pick
 log_message(1,"SIM ZONE 11 AT LOADC2 EXPECT DO57 ON")
 movj(p_even_load,0,speed_movej_fast,720,0)
 zone_tcp = get_atl_tcp_pose()
+# DO56: past DoorC1 + margin, and not in the Pick zone (Pick lies on the odd row beyond DoorC1 X).
 zone_odd = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
-    zone_odd = 1
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1 + zone_door_margin):
+    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) <= zone_y_pick_limit):
+        zone_odd = 1
+    end
 end
 zone_even = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2):
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2 - zone_door_margin):
     zone_even = 1
 end
 zone_pick = 0
@@ -1001,12 +1036,15 @@ zone_pick_last = zone_pick
 log_message(1,"SIM ZONE 12 AT HOMELOCATION EXPECT ALL OFF")
 movj(p_home_location,0,speed_movej_fast,720,0)
 zone_tcp = get_atl_tcp_pose()
+# DO56: past DoorC1 + margin, and not in the Pick zone (Pick lies on the odd row beyond DoorC1 X).
 zone_odd = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
-    zone_odd = 1
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1 + zone_door_margin):
+    if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) <= zone_y_pick_limit):
+        zone_odd = 1
+    end
 end
 zone_even = 0
-if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2):
+if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2 - zone_door_margin):
     zone_even = 1
 end
 zone_pick = 0

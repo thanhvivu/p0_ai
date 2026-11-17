@@ -299,3 +299,7 @@ Khác code gốc: chỉ thêm các dòng `ACTIVE POINT SET CNC1 CNC2`.
   sau đó **Loop 1 → Sub script chính (`jamaguchi_cnc36.txt`)**. Không sửa code chính.
   Nếu cần `set_tool_id(1)` / `set_user_frame_id(7)`: đặt trong khung kéo thả trước khối Run Program.
 * Test song song trong Simulation: Sub-thread1 = `zone/sim_zone_monitor.txt`, Sub chính = `sim/sim_test1_motion.txt`.
+* Test song song trong Simulation 2026-11-18 09:00 (`sim_main_simple` + `sim_zone_monitor`): **luồng phụ chạy song song đúng**,
+  bit đổi trong lúc robot đang di chuyển. Phát hiện: robot đứng ở Door đã bị tính là trong máy (ngưỡng = đúng X cửa),
+  và Pick (X_user 683.8) vượt mặt phẳng DoorC1 nên DO56 bật ở Pick. Đã sửa: khoảng đệm `zone_door_margin = 20` mm
+  sau mặt phẳng cửa; DO56 chỉ bật khi Y_user ≤ 1187.165 (không ở vùng Pick).

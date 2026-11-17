@@ -8,12 +8,15 @@ consts=['# X_user / Y_user = TCP in usrfr_thanh; formula inside if() (no arithme
 '# DoorC1 / DoorC2 X from the danger-boundary references in the main program.',
 'zone_x_door1 = 679.362',
 'zone_x_door2 = -365.358',
+'# Margin past the Door plane: the robot standing at a Door is NOT counted inside the CNC.',
+'zone_door_margin = 20.0',
 '# Pick point TCP in usrfr_thanh = [683.786,1237.165,330.754]; limit = Y_pick - 50 mm.',
 'zone_y_pick_limit = 1187.165',
 'zone_odd_last = -1','zone_even_last = -1','zone_pick_last = -1']
 check=['zone_tcp = get_atl_tcp_pose()',
-'zone_odd = 0','if(%s > zone_x_door1):'%XU,'    zone_odd = 1','end',
-'zone_even = 0','if(%s < zone_x_door2):'%XU,'    zone_even = 1','end',
+'# DO56: past DoorC1 + margin, and not in the Pick zone (Pick lies on the odd row beyond DoorC1 X).',
+'zone_odd = 0','if(%s > zone_x_door1 + zone_door_margin):'%XU,'    if(%s <= zone_y_pick_limit):'%YU,'        zone_odd = 1','    end','end',
+'zone_even = 0','if(%s < zone_x_door2 - zone_door_margin):'%XU,'    zone_even = 1','end',
 'zone_pick = 0','if(%s > zone_y_pick_limit):'%YU,'    zone_pick = 1','end']
 for var,last,idx,name in [('zone_odd','zone_odd_last',55,'DO56 ODD CNC ZONE'),('zone_even','zone_even_last',56,'DO57 EVEN CNC ZONE'),('zone_pick','zone_pick_last',57,'DO58 PICK ZONE')]:
     check+=['zone_chg = 1','if(%s == %s):'%(var,last),'    zone_chg = 0','end',

@@ -6,6 +6,8 @@
 # DoorC1 / DoorC2 X from the danger-boundary references in the main program.
 zone_x_door1 = 679.362
 zone_x_door2 = -365.358
+# Margin past the Door plane: the robot standing at a Door is NOT counted inside the CNC.
+zone_door_margin = 20.0
 # Pick point TCP in usrfr_thanh = [683.786,1237.165,330.754]; limit = Y_pick - 50 mm.
 zone_y_pick_limit = 1187.165
 zone_odd_last = -1
@@ -14,12 +16,15 @@ zone_pick_last = -1
 log_message(1,"ZONE MONITOR STARTED")
 while(1):
     zone_tcp = get_atl_tcp_pose()
+    # DO56: past DoorC1 + margin, and not in the Pick zone (Pick lies on the odd row beyond DoorC1 X).
     zone_odd = 0
-    if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1):
-        zone_odd = 1
+    if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) > zone_x_door1 + zone_door_margin):
+        if((-0.7085100607 * (zone_tcp[0] - 345.833) + 0.7056988446 * (zone_tcp[1] + 489.782) - 0.0016231544 * (zone_tcp[2] + 136.233)) <= zone_y_pick_limit):
+            zone_odd = 1
+        end
     end
     zone_even = 0
-    if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2):
+    if((0.7056980154 * (zone_tcp[0] - 345.833) + 0.7085118376 * (zone_tcp[1] + 489.782) + 0.0011344638 * (zone_tcp[2] + 136.233)) < zone_x_door2 - zone_door_margin):
         zone_even = 1
     end
     zone_pick = 0
