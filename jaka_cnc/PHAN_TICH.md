@@ -252,3 +252,7 @@ Log lấy đúng thứ tự từ `jamaguchi_cnc36.txt`. Trong ngoặc là tín h
 
 Không được xuất hiện: `WARNING AI16 ...`, mọi dòng `... ABORTED ...`, `DI16 CASE NOT COMPLETE HOME MOVE SKIPPED`.
 Khác code gốc: chỉ thêm các dòng `ACTIVE POINT SET CNC1 CNC2`.
+
+## 13. Chạy thật trên máy (2026-11-17)
+
+* **Chu trình CNC1/CNC2 (P2) với `jamaguchi_cnc36.txt`: chạy được, đúng quy trình** (người vận hành xác nhận).
