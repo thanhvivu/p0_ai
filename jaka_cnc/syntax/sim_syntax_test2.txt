@@ -1,5 +1,6 @@
 # !!! SIMULATION ONLY - no motion !!! Syntax test 2: logical operators and arithmetic in assignments.
 # Each step logs "Sn ..." BEFORE it runs; the controller stops at the first unsupported line,
+# S5-S9 removed: arithmetic in assignments is rejected by this controller - see sim_syntax_test3.txt
 # so the last Sn line shows which construct failed. "PASS" lines prove the value is correct.
 log_message(1,"S0 START")
 x = 3.0
@@ -15,39 +16,6 @@ end
 log_message(1,"S4 NOT EQUAL")
 if(x != y):
     log_message(1,"S4 PASS NOT EQUAL")
-end
-log_message(1,"S5 ASSIGN SCALAR ARITHMETIC")
-z = x * 2.0 + y - 1.0
-if(z > 9.99 && z < 10.01):
-    log_message(1,"S5 PASS Z EQUALS 10")
-end
-log_message(1,"S6 ASSIGN ARITHMETIC WITH ARRAY ELEMENTS")
-a = [1.0,2.0,3.0,4.0,5.0,6.0]
-w = a[0] * 2.0 + a[1] / 2.0
-if(w > 2.99 && w < 3.01):
-    log_message(1,"S6 PASS W EQUALS 3")
-end
-log_message(1,"S7 ASSIGN USER FRAME FORMULA FROM TCP")
-t = get_atl_tcp_pose()
-xu = 0.7056980154 * (t[0] - 345.833) + 0.7085118376 * (t[1] + 489.782) + 0.0011344638 * (t[2] + 136.233)
-if(xu - (0.7056980154 * (t[0] - 345.833) + 0.7085118376 * (t[1] + 489.782) + 0.0011344638 * (t[2] + 136.233)) < 0.001 && xu - (0.7056980154 * (t[0] - 345.833) + 0.7085118376 * (t[1] + 489.782) + 0.0011344638 * (t[2] + 136.233)) > -0.001):
-    log_message(1,"S7 PASS XU ASSIGN MATCHES IN-IF FORMULA")
-end
-log_message(1,"S8 COUNTER AND VARIABLE ARRAY INDEX")
-j = 0
-s = 0.0
-while(j < 6):
-    s = s + a[j]
-    j = j + 1
-end
-if(s > 20.99 && s < 21.01):
-    log_message(1,"S8 PASS SUM EQUALS 21")
-end
-log_message(1,"S9 ARRAY ELEMENT ASSIGN WITH ARITHMETIC")
-b = [0.0,0.0,0.0,0.0,0.0,0.0]
-b[2] = a[2] + 100.0
-if(b[2] > 102.99 && b[2] < 103.01):
-    log_message(1,"S9 PASS B2 EQUALS 103")
 end
 log_message(1,"S10 MIXED AND OR WITH PARENTHESES")
 if((x > 1.0 && y > 100.0) || (x < 10.0 && y < 10.0)):

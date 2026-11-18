@@ -1,0 +1,27 @@
+# !!! SIMULATION ONLY - no motion !!! Syntax test 3: which arithmetic assignment forms work.
+# Simplest first. The controller stops at the first rejected line: the last "Pn" line tells which.
+log_message(1,"P0 START")
+x = 3.0
+y = 5.0
+j = 0
+log_message(1,"P1 INTEGER INCREMENT j = j + 1")
+j = j + 1
+if(j == 1):
+    log_message(1,"P1 PASS")
+end
+log_message(1,"P2 SINGLE ADD z = x + y")
+z = x + y
+if(z > 7.99 && z < 8.01):
+    log_message(1,"P2 PASS")
+end
+log_message(1,"P3 SINGLE MULTIPLY z = x * 2.0")
+z = x * 2.0
+if(z > 5.99 && z < 6.01):
+    log_message(1,"P3 PASS")
+end
+log_message(1,"P4 WHOLE EXPRESSION IN PARENTHESES")
+z = (x * 2.0 + y - 1.0)
+if(z > 9.99 && z < 10.01):
+    log_message(1,"P4 PASS")
+end
+log_message(1,"SYNTAX TEST 3 END")
