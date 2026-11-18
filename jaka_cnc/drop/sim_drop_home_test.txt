@@ -375,7 +375,9 @@ p_home_location_max = [-38.100,61.711,111.885,199.140,-259.961,53.660]
 
 log_message(1,"SIM DROP HOME TEST START")
 sim_ai16 = 1
-sim_mid_pose = pose_add(p_drop_pose,[0.0,0.0,50.0,0.0,0.0,0.0])
+# array literal as a function argument is rejected: declare it first
+sim_up50 = [0.0,0.0,50.0,0.0,0.0,0.0]
+sim_mid_pose = pose_add(p_drop_pose,sim_up50)
 movj(p_home_location,0,speed_movej_fast,720,0)
 movj(p_drop_above_joint,0,speed_movej_fast,720,0)
 movl(p_drop_pose,0,50,200,0)

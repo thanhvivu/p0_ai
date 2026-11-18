@@ -143,7 +143,8 @@ h0=[k for k,l in enumerate(L) if l.strip()=='home_actual_joint = get_atl_joint_p
 h1=[k for k,l in enumerate(L) if 'DO16 ON ROBOT AT HOME WAIT DI90 OFF' in l][0]
 home=stub(dedent(L[h0:h1+2]))
 t2=WARN+header+['','log_message(1,"SIM DROP HOME TEST START")','sim_ai16 = 1',
- 'sim_mid_pose = pose_add(p_drop_pose,[0.0,0.0,50.0,0.0,0.0,0.0])']
+ '# array literal as a function argument is rejected: declare it first',
+ 'sim_up50 = [0.0,0.0,50.0,0.0,0.0,0.0]','sim_mid_pose = pose_add(p_drop_pose,sim_up50)']
 for k,(n,mv) in enumerate([('AT DROP POINT','movl(p_drop_pose,0,50,200,0)'),('50 MM ABOVE DROP','movl(sim_mid_pose,0,50,200,0)')],1):
     t2+=['movj(p_home_location,0,speed_movej_fast,720,0)','movj(p_drop_above_joint,0,speed_movej_fast,720,0)',mv,
          'home_route_door_done = 0','home_already_home = 0','home_route_hint = 0',
