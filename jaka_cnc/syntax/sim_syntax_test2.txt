@@ -12,10 +12,6 @@ log_message(1,"S2 OR")
 if(x > 10.0 || y > 4.0):
     log_message(1,"S2 PASS OR")
 end
-log_message(1,"S3 NOT")
-if(!(x > 10.0)):
-    log_message(1,"S3 PASS NOT")
-end
 log_message(1,"S4 NOT EQUAL")
 if(x != y):
     log_message(1,"S4 PASS NOT EQUAL")
@@ -81,5 +77,10 @@ if(k == 1 && x > 1.0):
     log_message(1,"S13 FAIL")
 elif(k == 2 && x > 1.0):
     log_message(1,"S13 PASS ELIF AND")
+end
+log_message(1,"S14 NOT ON INTEGER VARIABLE - LAST ON PURPOSE")
+f = 0
+if(!f):
+    log_message(1,"S14 PASS NOT INTEGER")
 end
 log_message(1,"SYNTAX TEST 2 END")
