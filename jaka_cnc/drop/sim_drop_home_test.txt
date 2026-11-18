@@ -321,7 +321,7 @@ p_drop_up_offset = [0.0,0.0,100.0,0.0,0.0,0.0]
 p_drop_pose = kine_forward(p_drop)
 p_drop_above_pose = pose_add(p_drop_pose,p_drop_up_offset)
 p_drop_above_joint = kine_inverse(p_drop,p_drop_above_pose)
-drop_ok = 0
+home_j = 0
 
 # Process 8 Case 1 - Change Tool - [CNC36] Load_daotool_Wait/Load_daotool re-taught 2026-11 (Z 355.4 -> 325.4)
 p_load_daotool_wait = [-5.321,90.910,100.547,165.270,-140.056,-48.007]
@@ -914,68 +914,18 @@ if(home_unload_daotool_segment == 1):
     home_match_valid = 1
 end
 
-# [DROP] Recognize any stopped position between the drop point and the point 100 mm above it.
-# A joint is outside when it is beyond BOTH endpoints by more than 5 degrees.
+# [DROP] Recognize any stopped position between the drop point and the point 100 mm above it:
+# a joint is outside when it is beyond BOTH endpoints by more than 5 degrees.
 home_process7_unload_segment = 1
-if(home_actual_joint[0] < p_drop[0] - 5.0):
-    if(home_actual_joint[0] < p_drop_above_joint[0] - 5.0):
+home_j = 0
+while(home_j < 6):
+    if(home_actual_joint[home_j] < p_drop[home_j] - 5.0 && home_actual_joint[home_j] < p_drop_above_joint[home_j] - 5.0):
         home_process7_unload_segment = 0
     end
-end
-if(home_actual_joint[0] > p_drop[0] + 5.0):
-    if(home_actual_joint[0] > p_drop_above_joint[0] + 5.0):
+    if(home_actual_joint[home_j] > p_drop[home_j] + 5.0 && home_actual_joint[home_j] > p_drop_above_joint[home_j] + 5.0):
         home_process7_unload_segment = 0
     end
-end
-if(home_actual_joint[1] < p_drop[1] - 5.0):
-    if(home_actual_joint[1] < p_drop_above_joint[1] - 5.0):
-        home_process7_unload_segment = 0
-    end
-end
-if(home_actual_joint[1] > p_drop[1] + 5.0):
-    if(home_actual_joint[1] > p_drop_above_joint[1] + 5.0):
-        home_process7_unload_segment = 0
-    end
-end
-if(home_actual_joint[2] < p_drop[2] - 5.0):
-    if(home_actual_joint[2] < p_drop_above_joint[2] - 5.0):
-        home_process7_unload_segment = 0
-    end
-end
-if(home_actual_joint[2] > p_drop[2] + 5.0):
-    if(home_actual_joint[2] > p_drop_above_joint[2] + 5.0):
-        home_process7_unload_segment = 0
-    end
-end
-if(home_actual_joint[3] < p_drop[3] - 5.0):
-    if(home_actual_joint[3] < p_drop_above_joint[3] - 5.0):
-        home_process7_unload_segment = 0
-    end
-end
-if(home_actual_joint[3] > p_drop[3] + 5.0):
-    if(home_actual_joint[3] > p_drop_above_joint[3] + 5.0):
-        home_process7_unload_segment = 0
-    end
-end
-if(home_actual_joint[4] < p_drop[4] - 5.0):
-    if(home_actual_joint[4] < p_drop_above_joint[4] - 5.0):
-        home_process7_unload_segment = 0
-    end
-end
-if(home_actual_joint[4] > p_drop[4] + 5.0):
-    if(home_actual_joint[4] > p_drop_above_joint[4] + 5.0):
-        home_process7_unload_segment = 0
-    end
-end
-if(home_actual_joint[5] < p_drop[5] - 5.0):
-    if(home_actual_joint[5] < p_drop_above_joint[5] - 5.0):
-        home_process7_unload_segment = 0
-    end
-end
-if(home_actual_joint[5] > p_drop[5] + 5.0):
-    if(home_actual_joint[5] > p_drop_above_joint[5] + 5.0):
-        home_process7_unload_segment = 0
-    end
+    home_j = (home_j + 1)
 end
 if(home_process7_unload_segment == 1):
     home_match_code = 19
@@ -1999,68 +1949,18 @@ if(home_unload_daotool_segment == 1):
     home_match_valid = 1
 end
 
-# [DROP] Recognize any stopped position between the drop point and the point 100 mm above it.
-# A joint is outside when it is beyond BOTH endpoints by more than 5 degrees.
+# [DROP] Recognize any stopped position between the drop point and the point 100 mm above it:
+# a joint is outside when it is beyond BOTH endpoints by more than 5 degrees.
 home_process7_unload_segment = 1
-if(home_actual_joint[0] < p_drop[0] - 5.0):
-    if(home_actual_joint[0] < p_drop_above_joint[0] - 5.0):
+home_j = 0
+while(home_j < 6):
+    if(home_actual_joint[home_j] < p_drop[home_j] - 5.0 && home_actual_joint[home_j] < p_drop_above_joint[home_j] - 5.0):
         home_process7_unload_segment = 0
     end
-end
-if(home_actual_joint[0] > p_drop[0] + 5.0):
-    if(home_actual_joint[0] > p_drop_above_joint[0] + 5.0):
+    if(home_actual_joint[home_j] > p_drop[home_j] + 5.0 && home_actual_joint[home_j] > p_drop_above_joint[home_j] + 5.0):
         home_process7_unload_segment = 0
     end
-end
-if(home_actual_joint[1] < p_drop[1] - 5.0):
-    if(home_actual_joint[1] < p_drop_above_joint[1] - 5.0):
-        home_process7_unload_segment = 0
-    end
-end
-if(home_actual_joint[1] > p_drop[1] + 5.0):
-    if(home_actual_joint[1] > p_drop_above_joint[1] + 5.0):
-        home_process7_unload_segment = 0
-    end
-end
-if(home_actual_joint[2] < p_drop[2] - 5.0):
-    if(home_actual_joint[2] < p_drop_above_joint[2] - 5.0):
-        home_process7_unload_segment = 0
-    end
-end
-if(home_actual_joint[2] > p_drop[2] + 5.0):
-    if(home_actual_joint[2] > p_drop_above_joint[2] + 5.0):
-        home_process7_unload_segment = 0
-    end
-end
-if(home_actual_joint[3] < p_drop[3] - 5.0):
-    if(home_actual_joint[3] < p_drop_above_joint[3] - 5.0):
-        home_process7_unload_segment = 0
-    end
-end
-if(home_actual_joint[3] > p_drop[3] + 5.0):
-    if(home_actual_joint[3] > p_drop_above_joint[3] + 5.0):
-        home_process7_unload_segment = 0
-    end
-end
-if(home_actual_joint[4] < p_drop[4] - 5.0):
-    if(home_actual_joint[4] < p_drop_above_joint[4] - 5.0):
-        home_process7_unload_segment = 0
-    end
-end
-if(home_actual_joint[4] > p_drop[4] + 5.0):
-    if(home_actual_joint[4] > p_drop_above_joint[4] + 5.0):
-        home_process7_unload_segment = 0
-    end
-end
-if(home_actual_joint[5] < p_drop[5] - 5.0):
-    if(home_actual_joint[5] < p_drop_above_joint[5] - 5.0):
-        home_process7_unload_segment = 0
-    end
-end
-if(home_actual_joint[5] > p_drop[5] + 5.0):
-    if(home_actual_joint[5] > p_drop_above_joint[5] + 5.0):
-        home_process7_unload_segment = 0
-    end
+    home_j = (home_j + 1)
 end
 if(home_process7_unload_segment == 1):
     home_match_code = 19

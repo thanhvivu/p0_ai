@@ -349,7 +349,14 @@ Sinh từ `jamaguchi_cnc36.txt` bằng `drop/tao_drop.py`; chỉ đổi P7, mọ
 | Phép tính trong điều kiện `if(...)`, chỉ số mảng hằng `a[0]` | dùng được |
 | Gán phần tử mảng từ phần tử mảng khác `b[0] = a[0]`, gán nguyên mảng `c = a` | dùng được |
 | `!` (NOT) | **không dùng được** (Wrong data format), kể cả với biến số nguyên → dùng phép so sánh ngược |
-| Phép tính nhiều bước khi gán `z = x * 2.0 + y - 1.0` | **không dùng được** |
+| Phép tính khi gán **không bọc ngoặc** `z = x * 2.0 + y - 1.0`, `j = j + 1` | **không dùng được** |
+| Phép tính khi gán **bọc cả biểu thức trong ngoặc** `j = (j + 1)`, `xu = (0.7057 * (t[0] - 345.833) + ...)`, `b[2] = (a[2] + 100.0)` | **dùng được** (test 3, P1–P9) |
+| `while` với biến đếm, chỉ số mảng là biến `a[j]` (trong gán và trong `if`) | **dùng được** |
 | Dấu ngoặc `( )` trong chuỗi log | **không dùng được** |
 | Hàm tự định nghĩa | không có trong bản phần mềm này |
-| Phép tính đơn khi gán (`j = j + 1`, `z = x + y`) | đang thử: `syntax/sim_syntax_test3.txt` |
+
+## 21. Rút gọn bằng cú pháp đã kiểm chứng (2026-11-19)
+
+* `zone/zone_monitor.txt`: 75 → 57 dòng (tính X/Y_user một lần vào biến, `&&` + `elif` cho ghi DO khi đổi trạng thái).
+* `drop/jamaguchi_cnc1_drop.txt`: P7 dùng `wait_input`, kiểm tra an toàn 1 dòng `||`;
+  nhận diện đoạn điểm thả khi Home dùng vòng `while` 6 khớp (63 → 12 dòng).

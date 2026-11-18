@@ -320,7 +320,7 @@ p_drop_up_offset = [0.0,0.0,100.0,0.0,0.0,0.0]
 p_drop_pose = kine_forward(p_drop)
 p_drop_above_pose = pose_add(p_drop_pose,p_drop_up_offset)
 p_drop_above_joint = kine_inverse(p_drop,p_drop_above_pose)
-drop_ok = 0
+home_j = 0
 
 # Process 8 Case 1 - Change Tool - [CNC36] Load_daotool_Wait/Load_daotool re-taught 2026-11 (Z 355.4 -> 325.4)
 p_load_daotool_wait = [-5.321,90.910,100.547,165.270,-140.056,-48.007]
@@ -1201,68 +1201,18 @@ while(1):
                     home_match_valid = 1
                 end
 
-                # [DROP] Recognize any stopped position between the drop point and the point 100 mm above it.
-                # A joint is outside when it is beyond BOTH endpoints by more than 5 degrees.
+                # [DROP] Recognize any stopped position between the drop point and the point 100 mm above it:
+                # a joint is outside when it is beyond BOTH endpoints by more than 5 degrees.
                 home_process7_unload_segment = 1
-                if(home_actual_joint[0] < p_drop[0] - 5.0):
-                    if(home_actual_joint[0] < p_drop_above_joint[0] - 5.0):
+                home_j = 0
+                while(home_j < 6):
+                    if(home_actual_joint[home_j] < p_drop[home_j] - 5.0 && home_actual_joint[home_j] < p_drop_above_joint[home_j] - 5.0):
                         home_process7_unload_segment = 0
                     end
-                end
-                if(home_actual_joint[0] > p_drop[0] + 5.0):
-                    if(home_actual_joint[0] > p_drop_above_joint[0] + 5.0):
+                    if(home_actual_joint[home_j] > p_drop[home_j] + 5.0 && home_actual_joint[home_j] > p_drop_above_joint[home_j] + 5.0):
                         home_process7_unload_segment = 0
                     end
-                end
-                if(home_actual_joint[1] < p_drop[1] - 5.0):
-                    if(home_actual_joint[1] < p_drop_above_joint[1] - 5.0):
-                        home_process7_unload_segment = 0
-                    end
-                end
-                if(home_actual_joint[1] > p_drop[1] + 5.0):
-                    if(home_actual_joint[1] > p_drop_above_joint[1] + 5.0):
-                        home_process7_unload_segment = 0
-                    end
-                end
-                if(home_actual_joint[2] < p_drop[2] - 5.0):
-                    if(home_actual_joint[2] < p_drop_above_joint[2] - 5.0):
-                        home_process7_unload_segment = 0
-                    end
-                end
-                if(home_actual_joint[2] > p_drop[2] + 5.0):
-                    if(home_actual_joint[2] > p_drop_above_joint[2] + 5.0):
-                        home_process7_unload_segment = 0
-                    end
-                end
-                if(home_actual_joint[3] < p_drop[3] - 5.0):
-                    if(home_actual_joint[3] < p_drop_above_joint[3] - 5.0):
-                        home_process7_unload_segment = 0
-                    end
-                end
-                if(home_actual_joint[3] > p_drop[3] + 5.0):
-                    if(home_actual_joint[3] > p_drop_above_joint[3] + 5.0):
-                        home_process7_unload_segment = 0
-                    end
-                end
-                if(home_actual_joint[4] < p_drop[4] - 5.0):
-                    if(home_actual_joint[4] < p_drop_above_joint[4] - 5.0):
-                        home_process7_unload_segment = 0
-                    end
-                end
-                if(home_actual_joint[4] > p_drop[4] + 5.0):
-                    if(home_actual_joint[4] > p_drop_above_joint[4] + 5.0):
-                        home_process7_unload_segment = 0
-                    end
-                end
-                if(home_actual_joint[5] < p_drop[5] - 5.0):
-                    if(home_actual_joint[5] < p_drop_above_joint[5] - 5.0):
-                        home_process7_unload_segment = 0
-                    end
-                end
-                if(home_actual_joint[5] > p_drop[5] + 5.0):
-                    if(home_actual_joint[5] > p_drop_above_joint[5] + 5.0):
-                        home_process7_unload_segment = 0
-                    end
+                    home_j = (home_j + 1)
                 end
                 if(home_process7_unload_segment == 1):
                     home_match_code = 19
@@ -3093,30 +3043,10 @@ while(1):
                             if(active_process == 7):
                                 if(active_case == 52):
                                     log_message(1,"CURRENT P7 CASE1 DROP OUTSIDE RUN")
-                                    # Safety check: the lift offset must be +100 mm straight up (Z), X/Y unchanged.
-                                    # If pose_add works in another frame the drop is skipped instead of moving the wrong way.
-                                    drop_ok = 1
-                                    if(p_drop_above_pose[2] < p_drop_pose[2] + 90.0):
-                                        drop_ok = 0
-                                    end
-                                    if(p_drop_above_pose[2] > p_drop_pose[2] + 110.0):
-                                        drop_ok = 0
-                                    end
-                                    if(p_drop_above_pose[0] > p_drop_pose[0] + 5.0):
-                                        drop_ok = 0
-                                    end
-                                    if(p_drop_above_pose[0] < p_drop_pose[0] - 5.0):
-                                        drop_ok = 0
-                                    end
-                                    if(p_drop_above_pose[1] > p_drop_pose[1] + 5.0):
-                                        drop_ok = 0
-                                    end
-                                    if(p_drop_above_pose[1] < p_drop_pose[1] - 5.0):
-                                        drop_ok = 0
-                                    end
-                                    if(drop_ok == 0):
+                                    # Safety check: the computed point must be 100 mm straight above the drop point.
+                                    if(p_drop_above_pose[2] - p_drop_pose[2] < 99.0 || p_drop_above_pose[2] - p_drop_pose[2] > 101.0):
                                         case_motion_ok = 0
-                                        log_message(2,"P7C1 DROP SKIPPED LIFT OFFSET IS NOT STRAIGHT UP CHECK POSE_ADD")
+                                        log_message(2,"P7C1 DROP SKIPPED LIFT OFFSET IS NOT 100 MM UP")
                                     end
                                     if(case_motion_ok == 1):
                                         log_message(1,"P7C1 MOVEJ HOMELOCATION START")
@@ -3130,11 +3060,7 @@ while(1):
                                         log_message(1,"P7C1 DROP COMPLETE")
                                         set_digital_output(4,64,1,1)
                                         log_message(1,"P7C1 DO65 ON WAIT DI65 ON UNCLAMP TOOL UNLOAD")
-                                        di65 = get_digital_input(4,64)
-                                        while(di65 == 0):
-                                            sleep(0.1)
-                                            di65 = get_digital_input(4,64)
-                                        end
+                                        wait_input(4,64,1,0)
                                         set_digital_output(4,64,0,1)
                                         log_message(1,"P7C1 DI65 ON DO65 OFF UNCLAMP COMPLETE")
                                         log_message(1,"P7C1 MOVEL LIFT Z 100 START")

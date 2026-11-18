@@ -321,7 +321,7 @@ p_drop_up_offset = [0.0,0.0,100.0,0.0,0.0,0.0]
 p_drop_pose = kine_forward(p_drop)
 p_drop_above_pose = pose_add(p_drop_pose,p_drop_up_offset)
 p_drop_above_joint = kine_inverse(p_drop,p_drop_above_pose)
-drop_ok = 0
+home_j = 0
 
 # Process 8 Case 1 - Change Tool - [CNC36] Load_daotool_Wait/Load_daotool re-taught 2026-11 (Z 355.4 -> 325.4)
 p_load_daotool_wait = [-5.321,90.910,100.547,165.270,-140.056,-48.007]
@@ -381,30 +381,10 @@ case_motion_ok = 1
 if(active_process == 7):
     if(active_case == 52):
         log_message(1,"CURRENT P7 CASE1 DROP OUTSIDE RUN")
-        # Safety check: the lift offset must be +100 mm straight up (Z), X/Y unchanged.
-        # If pose_add works in another frame the drop is skipped instead of moving the wrong way.
-        drop_ok = 1
-        if(p_drop_above_pose[2] < p_drop_pose[2] + 90.0):
-            drop_ok = 0
-        end
-        if(p_drop_above_pose[2] > p_drop_pose[2] + 110.0):
-            drop_ok = 0
-        end
-        if(p_drop_above_pose[0] > p_drop_pose[0] + 5.0):
-            drop_ok = 0
-        end
-        if(p_drop_above_pose[0] < p_drop_pose[0] - 5.0):
-            drop_ok = 0
-        end
-        if(p_drop_above_pose[1] > p_drop_pose[1] + 5.0):
-            drop_ok = 0
-        end
-        if(p_drop_above_pose[1] < p_drop_pose[1] - 5.0):
-            drop_ok = 0
-        end
-        if(drop_ok == 0):
+        # Safety check: the computed point must be 100 mm straight above the drop point.
+        if(p_drop_above_pose[2] - p_drop_pose[2] < 99.0 || p_drop_above_pose[2] - p_drop_pose[2] > 101.0):
             case_motion_ok = 0
-            log_message(2,"P7C1 DROP SKIPPED LIFT OFFSET IS NOT STRAIGHT UP CHECK POSE_ADD")
+            log_message(2,"P7C1 DROP SKIPPED LIFT OFFSET IS NOT 100 MM UP")
         end
         if(case_motion_ok == 1):
             log_message(1,"P7C1 MOVEJ HOMELOCATION START")

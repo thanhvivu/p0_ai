@@ -37,7 +37,7 @@ decl=['',
 'p_drop_pose = kine_forward(p_drop)',
 'p_drop_above_pose = pose_add(p_drop_pose,p_drop_up_offset)',
 'p_drop_above_joint = kine_inverse(p_drop,p_drop_above_pose)',
-'drop_ok = 0']
+'home_j = 0']
 L[i+1:i+1]=decl
 
 # ---------- 2. P7 Case1 motion ----------
@@ -46,16 +46,11 @@ a=[k for k in a if 'if(active_case == 52):' in L[k+1]][0]
 a,b=blk(a)
 ind=L[a][:len(L[a])-len(L[a].lstrip())]
 s=ind+'        '
-guard=['# Safety check: the lift offset must be +100 mm straight up (Z), X/Y unchanged.',
-'# If pose_add works in another frame the drop is skipped instead of moving the wrong way.',
-'drop_ok = 1',
-'if(p_drop_above_pose[2] < p_drop_pose[2] + 90.0):','    drop_ok = 0','end',
-'if(p_drop_above_pose[2] > p_drop_pose[2] + 110.0):','    drop_ok = 0','end',
-'if(p_drop_above_pose[0] > p_drop_pose[0] + 5.0):','    drop_ok = 0','end',
-'if(p_drop_above_pose[0] < p_drop_pose[0] - 5.0):','    drop_ok = 0','end',
-'if(p_drop_above_pose[1] > p_drop_pose[1] + 5.0):','    drop_ok = 0','end',
-'if(p_drop_above_pose[1] < p_drop_pose[1] - 5.0):','    drop_ok = 0','end',
-'if(drop_ok == 0):','    case_motion_ok = 0','    log_message(2,"P7C1 DROP SKIPPED LIFT OFFSET IS NOT STRAIGHT UP CHECK POSE_ADD")','end']
+guard=['# Safety check: the computed point must be 100 mm straight above the drop point.',
+'if(p_drop_above_pose[2] - p_drop_pose[2] < 99.0 || p_drop_above_pose[2] - p_drop_pose[2] > 101.0):',
+'    case_motion_ok = 0',
+'    log_message(2,"P7C1 DROP SKIPPED LIFT OFFSET IS NOT 100 MM UP")',
+'end']
 body=['log_message(1,"CURRENT P7 CASE1 DROP OUTSIDE RUN")']+guard+[
 'if(case_motion_ok == 1):',
 '    log_message(1,"P7C1 MOVEJ HOMELOCATION START")',
@@ -69,8 +64,7 @@ body=['log_message(1,"CURRENT P7 CASE1 DROP OUTSIDE RUN")']+guard+[
 '    log_message(1,"P7C1 DROP COMPLETE")',
 '    set_digital_output(4,64,1,1)',
 '    log_message(1,"P7C1 DO65 ON WAIT DI65 ON UNCLAMP TOOL UNLOAD")',
-'    di65 = get_digital_input(4,64)',
-'    while(di65 == 0):','        sleep(0.1)','        di65 = get_digital_input(4,64)','    end',
+'    wait_input(4,64,1,0)',
 '    set_digital_output(4,64,0,1)',
 '    log_message(1,"P7C1 DI65 ON DO65 OFF UNCLAMP COMPLETE")',
 '    log_message(1,"P7C1 MOVEL LIFT Z 100 START")',
@@ -90,14 +84,19 @@ L[a:b+1]=[ind+'if(active_process == 7):',ind+'    if(active_case == 52):']+[s+x 
 h0=find(lambda l:'# Recognize any stopped position between Process7Unload and its Wait point.' in l)
 h1=find(lambda l:l.strip()=='if(home_process7_unload_segment == 1):',h0)
 ind=L[h0][:len(L[h0])-len(L[h0].lstrip())]
-seg=['# [DROP] Recognize any stopped position between the drop point and the point 100 mm above it.',
-'# A joint is outside when it is beyond BOTH endpoints by more than 5 degrees.',
-'home_process7_unload_segment = 1']
-for j in range(6):
-    seg+=['if(home_actual_joint[%d] < p_drop[%d] - 5.0):'%(j,j),'    if(home_actual_joint[%d] < p_drop_above_joint[%d] - 5.0):'%(j,j),
-          '        home_process7_unload_segment = 0','    end','end',
-          'if(home_actual_joint[%d] > p_drop[%d] + 5.0):'%(j,j),'    if(home_actual_joint[%d] > p_drop_above_joint[%d] + 5.0):'%(j,j),
-          '        home_process7_unload_segment = 0','    end','end']
+seg=['# [DROP] Recognize any stopped position between the drop point and the point 100 mm above it:',
+'# a joint is outside when it is beyond BOTH endpoints by more than 5 degrees.',
+'home_process7_unload_segment = 1',
+'home_j = 0',
+'while(home_j < 6):',
+'    if(home_actual_joint[home_j] < p_drop[home_j] - 5.0 && home_actual_joint[home_j] < p_drop_above_joint[home_j] - 5.0):',
+'        home_process7_unload_segment = 0',
+'    end',
+'    if(home_actual_joint[home_j] > p_drop[home_j] + 5.0 && home_actual_joint[home_j] > p_drop_above_joint[home_j] + 5.0):',
+'        home_process7_unload_segment = 0',
+'    end',
+'    home_j = (home_j + 1)',
+'end']
 ok(seg,'seg')
 L[h0:h1]=[ind+x for x in seg]
 k=find(lambda l:'log_message(1,"HOME ACTUAL POSITION IN PROCESS7UNLOAD SEGMENT")' in l)
@@ -126,6 +125,8 @@ def stub(lines):
         if t.startswith('set_digital_output('): out.append(sp+'sleep(0.01)'); continue
         m=re.match(r'^(di\d+) = get_digital_input\(4,(\d+)\)$',t)
         if m: out+= [sp+'log_message(1,"SIM SKIP WAIT DI%d")'%(int(m.group(2))+1), sp+'sleep(0.3)']; continue
+        m=re.match(r'^wait_input\(4,(\d+),1,0\)$',t)
+        if m: out+= [sp+'log_message(1,"SIM SKIP WAIT DI%d")'%(int(m.group(1))+1), sp+'sleep(0.3)']; continue
         l=l.replace('get_analog_input(4,15)','sim_ai16')
         assert 'get_digital_input' not in l and 'wait_input' not in l, l
         out.append(l)
