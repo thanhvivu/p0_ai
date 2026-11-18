@@ -379,3 +379,12 @@ Chuẩn bị: giữ `jamaguchi_cnc36.txt` trên bộ điều khiển (tên khác
 5. **Home DI90 quanh điểm thả**: cho robot dừng giữa đường xuống/lên (Pause/Stop), bật DI90 →
    `HOME ACTUAL POSITION IN DROP SEGMENT` → MoveL thẳng lên → Home.
 6. Nếu chạy kèm `zone_monitor`: ở điểm thả DO58 ON (Y_user 1317 > 1187) – bình thường.
+
+## 23. Kết quả tìm hiểu user frame (Simulation Zu5, tool 0, 2026-11-19)
+
+* `get_atl_tcp_pose()` và `kine_forward()` **trả về theo user frame đang chọn** (đổi khi `set_user_frame_id`).
+  → Comment cũ "returns Base" chỉ đúng khi chương trình chạy với user frame 0. Phần vùng nguy hiểm khi Home
+  chạy đúng trên máy thật ⇒ nhiều khả năng lúc chạy chương trình user frame = 0 (cần xác nhận).
+* `movl(...,1,...)` dịch theo trục của user frame đang chọn (hệ 0: trục base; hệ 7: chéo 45° = trục user). Đúng tài liệu.
+* `movl(...,2,...)` dịch theo trục tool (tool 0 ở Home: trục Z nghiêng).
+* Giá trị đọc ở hệ 7 chưa khớp công thức trong ±1,5 mm (góc xoay thì khớp) → đang đo mức lệch: `syntax/sim_userframe_learn2.txt`.

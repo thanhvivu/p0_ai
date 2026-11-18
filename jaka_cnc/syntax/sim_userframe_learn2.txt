@@ -1,0 +1,60 @@
+# !!! SIMULATION ONLY - one MoveJ to HomeLocation, then no motion !!!
+# How far is "pose read in user frame 7" from "pose read in frame 0 + conversion formula"?
+p_home_location = [-43.100,56.711,106.885,194.140,-264.961,48.660]
+log_message(1,"UF2 START")
+set_tool_id(0)
+set_user_frame_id(0)
+movj(p_home_location,0,40,720,0)
+sleep(0.5)
+uf_a0 = get_atl_tcp_pose()
+set_user_frame_id(7)
+sleep(0.5)
+uf_a7 = get_atl_tcp_pose()
+uf_ex = (uf_a7[0] - (0.7056980154 * (uf_a0[0] - 345.833) + 0.7085118376 * (uf_a0[1] + 489.782) + 0.0011344638 * (uf_a0[2] + 136.233)))
+uf_ey = (uf_a7[1] - (-0.7085100607 * (uf_a0[0] - 345.833) + 0.7056988446 * (uf_a0[1] + 489.782) + -0.0016231544 * (uf_a0[2] + 136.233)))
+uf_ez = (uf_a7[2] - (-0.0019506139 * (uf_a0[0] - 345.833) + 0.0003416778 * (uf_a0[1] + 489.782) + 0.9999980392 * (uf_a0[2] + 136.233)))
+if(uf_ex < 2.0 && uf_ex > -2.0):
+    log_message(1,"UF2 X FORMULA ERROR UNDER 2 MM")
+elif(uf_ex < 10.0 && uf_ex > -10.0):
+    log_message(1,"UF2 X FORMULA ERROR 2 TO 10 MM")
+elif(uf_ex < 50.0 && uf_ex > -50.0):
+    log_message(1,"UF2 X FORMULA ERROR 10 TO 50 MM")
+elif(uf_ex < 150.0 && uf_ex > -150.0):
+    log_message(1,"UF2 X FORMULA ERROR 50 TO 150 MM")
+else:
+    log_message(1,"UF2 X FORMULA ERROR OVER 150 MM")
+end
+if(uf_ey < 2.0 && uf_ey > -2.0):
+    log_message(1,"UF2 Y FORMULA ERROR UNDER 2 MM")
+elif(uf_ey < 10.0 && uf_ey > -10.0):
+    log_message(1,"UF2 Y FORMULA ERROR 2 TO 10 MM")
+elif(uf_ey < 50.0 && uf_ey > -50.0):
+    log_message(1,"UF2 Y FORMULA ERROR 10 TO 50 MM")
+elif(uf_ey < 150.0 && uf_ey > -150.0):
+    log_message(1,"UF2 Y FORMULA ERROR 50 TO 150 MM")
+else:
+    log_message(1,"UF2 Y FORMULA ERROR OVER 150 MM")
+end
+if(uf_ez < 2.0 && uf_ez > -2.0):
+    log_message(1,"UF2 Z FORMULA ERROR UNDER 2 MM")
+elif(uf_ez < 10.0 && uf_ez > -10.0):
+    log_message(1,"UF2 Z FORMULA ERROR 2 TO 10 MM")
+elif(uf_ez < 50.0 && uf_ez > -50.0):
+    log_message(1,"UF2 Z FORMULA ERROR 10 TO 50 MM")
+elif(uf_ez < 150.0 && uf_ez > -150.0):
+    log_message(1,"UF2 Z FORMULA ERROR 50 TO 150 MM")
+else:
+    log_message(1,"UF2 Z FORMULA ERROR OVER 150 MM")
+end
+# Sign of the error helps to find a wrong origin value
+if(uf_ex > 0.0):
+    log_message(1,"UF2 X ERROR POSITIVE")
+else:
+    log_message(1,"UF2 X ERROR NEGATIVE")
+end
+if(uf_ey > 0.0):
+    log_message(1,"UF2 Y ERROR POSITIVE")
+else:
+    log_message(1,"UF2 Y ERROR NEGATIVE")
+end
+log_message(1,"UF2 END - USER FRAME 7 LEFT SELECTED")
