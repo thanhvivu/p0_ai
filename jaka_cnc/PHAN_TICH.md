@@ -363,3 +363,19 @@ Sinh từ `jamaguchi_cnc36.txt` bằng `drop/tao_drop.py`; chỉ đổi P7, mọ
   (vòng `while` 6 khớp nhận diện đoạn điểm thả, MoveL thẳng lên rồi về Home).
 * `drop/jamaguchi_cnc1_drop.txt`: P7 dùng `wait_input`, kiểm tra an toàn 1 dòng `||`;
   nhận diện đoạn điểm thả khi Home dùng vòng `while` 6 khớp (63 → 12 dòng).
+
+## 22. Checklist chạy thật chương trình thả hàng `drop/jamaguchi_cnc1_drop.txt`
+
+Chuẩn bị: giữ `jamaguchi_cnc36.txt` trên bộ điều khiển (tên khác) để đổi lại; AI3 ≤ 20; tool_thanh + usrfr_thanh.
+1. **Kiểm tra điểm trước khi chạy chương trình**: Manual → Joint Move tới `p_drop`; xác nhận Tool Unload hướng xuống,
+   đúng độ cao nhả hàng. Jog Z+ 100 mm (hệ usrfr_thanh) xem phía trên thoáng.
+2. **Chu trình CNC1** (như cũ): DI19 → DI83 → DI31 Unload CNC1 → DO31 → DI17 → DI16 thoát (robot ở DoorC1).
+3. **Thả hàng**: PLC bật DI24 (P7) → log `CURRENT P7 AO2 7 DO24 ON WAIT DI53 ON OR DI16 ON` → bật DI53.
+   Log phải theo thứ tự: `CURRENT P7 CASE1 DROP OUTSIDE RUN` → `P7C1 HOMELOCATION COMPLETE` →
+   `P7C1 DROP ABOVE COMPLETE` → `P7C1 DROP COMPLETE` → `P7C1 DO65 ON WAIT DI65 ON UNCLAMP TOOL UNLOAD`
+   (PLC nhả Tool Unload, trả DI65) → `P7C1 LIFT Z 100 COMPLETE` → `P7C1 END AT HOMELOCATION` →
+   `P7 CASE1 DO53 ON HOLD UNTIL DI17 ON` → DI17 → DI16 thoát P7 (robot ở Home, DO16 ON).
+4. Không được thấy: `P7C1 DROP SKIPPED ...`, `P7C1 ABORTED ...`.
+5. **Home DI90 quanh điểm thả**: cho robot dừng giữa đường xuống/lên (Pause/Stop), bật DI90 →
+   `HOME ACTUAL POSITION IN DROP SEGMENT` → MoveL thẳng lên → Home.
+6. Nếu chạy kèm `zone_monitor`: ở điểm thả DO58 ON (Y_user 1317 > 1187) – bình thường.
