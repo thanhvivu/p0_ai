@@ -339,3 +339,17 @@ Sinh từ `jamaguchi_cnc36.txt` bằng `drop/tao_drop.py`; chỉ đổi P7, mọ
 * Home DI90: thay vùng nhận diện P7 cũ bằng đoạn điểm thả ↔ điểm trên cao (±5°, tự tính từ điểm);
   đường lùi = MoveL thẳng lên điểm trên cao (30 mm/s) → Home.
 * Test Simulation: `drop/sim_drop_test.txt`, `drop/sim_drop_home_test.txt`.
+
+## 20. Cú pháp script đã kiểm chứng trên bộ điều khiển (Simulation, 2026-11-19)
+
+| Cú pháp | Kết quả |
+|---|---|
+| `&&`, `\|\|`, `!=`, kết hợp có ngoặc | dùng được |
+| `if / elif / else / end` | dùng được |
+| Phép tính trong điều kiện `if(...)`, chỉ số mảng hằng `a[0]` | dùng được |
+| Gán phần tử mảng từ phần tử mảng khác `b[0] = a[0]`, gán nguyên mảng `c = a` | dùng được |
+| `!` (NOT) | **không dùng được** (Wrong data format), kể cả với biến số nguyên → dùng phép so sánh ngược |
+| Phép tính nhiều bước khi gán `z = x * 2.0 + y - 1.0` | **không dùng được** |
+| Dấu ngoặc `( )` trong chuỗi log | **không dùng được** |
+| Hàm tự định nghĩa | không có trong bản phần mềm này |
+| Phép tính đơn khi gán (`j = j + 1`, `z = x + y`) | đang thử: `syntax/sim_syntax_test3.txt` |
