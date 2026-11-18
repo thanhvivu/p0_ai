@@ -359,6 +359,7 @@ Sinh từ `jamaguchi_cnc36.txt` bằng `drop/tao_drop.py`; chỉ đổi P7, mọ
 ## 21. Rút gọn bằng cú pháp đã kiểm chứng (2026-11-19)
 
 * `zone/zone_monitor.txt`: 75 → 57 dòng (tính X/Y_user một lần vào biến, `&&` + `elif` cho ghi DO khi đổi trạng thái).
-* Simulation 2026-11-19: `sim_drop_test` **đạt** (pose_add nhấc đúng 100 mm).
+* Simulation 2026-11-19: `sim_drop_test` **đạt** (pose_add nhấc đúng 100 mm); `sim_drop_home_test` **đạt**
+  (vòng `while` 6 khớp nhận diện đoạn điểm thả, MoveL thẳng lên rồi về Home).
 * `drop/jamaguchi_cnc1_drop.txt`: P7 dùng `wait_input`, kiểm tra an toàn 1 dòng `||`;
   nhận diện đoạn điểm thả khi Home dùng vòng `while` 6 khớp (63 → 12 dòng).
