@@ -311,10 +311,11 @@ p_process7_unload_segment_min = [-16.734,115.850,87.117,124.613,-270.256,130.530
 p_process7_unload_segment_max = [-6.733,139.268,102.282,153.195,-260.255,140.530]
 
 # ===== [DROP] P7 Case1 = drop the part unloaded from CNC1 at an outside point =====
-# !!! PLACEHOLDER: p_drop is a COPY of p_process7_unload. Replace with the taught drop point
-# !!! (Tool Unload holding the part, at the release height).
-p_drop = [-11.734,134.268,97.282,129.613,-265.256,135.530]
-# Approach / lift height above the drop point: +100 mm Z.
+# Drop point taught 2026-11-18 (usrfr_thanh + tool_thanh): TCP X -112.925, Y 1317.358, Z 353.706,
+# RX -86.283, RY -48.285, RZ -2.003. Tool Unload holding the part at the release height.
+p_drop = [-9.049,127.295,101.570,128.230,-234.974,129.924]
+# Approach / lift height: +100 mm Z. pose_add adds XYZ directly (same frame as kine_forward) and
+# keeps the orientation (R_res = R_offset * R_pose, R_offset = identity), so this is straight up.
 p_drop_up_offset = [0.0,0.0,100.0,0.0,0.0,0.0]
 p_drop_pose = kine_forward(p_drop)
 p_drop_above_pose = pose_add(p_drop_pose,p_drop_up_offset)

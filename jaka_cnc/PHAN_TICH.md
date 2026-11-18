@@ -330,7 +330,10 @@ Sinh từ `jamaguchi_cnc36.txt` bằng `drop/tao_drop.py`; chỉ đổi P7, mọ
 * Chu trình: P2 Unload CNC1 (DI31) → DI17 → DI16 thoát (robot ở DoorC1) → PLC bật **P7 (DI24) → Case DI53**:
   MoveJ HomeLocation → MoveJ điểm trên cao (điểm thả + Z 100 mm) → MoveL xuống điểm thả →
   DO65/DI65 nhả Tool Unload → MoveL nhấc Z 100 mm → MoveJ HomeLocation → DO53 Case Comp.
-* `p_drop` hiện là **PLACEHOLDER** (= `p_process7_unload`), cần teach điểm thả thật.
+* `p_drop` = [-9.049,127.295,101.570,128.230,-234.974,129.924] (teach 2026-11-18, usrfr_thanh + tool_thanh:
+  X −112.925, Y 1317.358, Z 353.706). Y_user 1317 > 1187 nên **DO58 (vùng Pick) sẽ ON khi robot ở điểm thả**.
+* `pose_add` (tài liệu JAKA 3.4.2.1): cộng XYZ trực tiếp, hướng R_res = R_pos2·R_pos1 → offset [0,0,100,0,0,0]
+  = nhấc thẳng đứng, giữ hướng tool.
 * Kiểm tra an toàn: nếu `pose_add` không cho ra đúng +100 mm theo Z (X/Y lệch > 5 mm), Case bị bỏ,
   log `P7C1 DROP SKIPPED LIFT OFFSET IS NOT STRAIGHT UP CHECK POSE_ADD`.
 * Home DI90: thay vùng nhận diện P7 cũ bằng đoạn điểm thả ↔ điểm trên cao (±5°, tự tính từ điểm);
