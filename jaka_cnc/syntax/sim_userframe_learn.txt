@@ -1,0 +1,92 @@
+# !!! SIMULATION ONLY !!! Learn how user frame commands behave. Small moves around HomeLocation.
+# User frame id 7 = usrfr_thanh [345.833,-489.782,-136.233,-0.093,-0.065,45.114]. If your simulation
+# stores it under another id, replace every set_user_frame_id(7) below with that id.
+# Every result is written as a log line A1, A2, B1, B2, C1.
+p_home_location = [-43.100,56.711,106.885,194.140,-264.961,48.660]
+uf_dx50 = [50.0,0.0,0.0,0.0,0.0,0.0]
+uf_dxm50 = [-50.0,0.0,0.0,0.0,0.0,0.0]
+uf_dz30 = [0.0,0.0,30.0,0.0,0.0,0.0]
+uf_dzm30 = [0.0,0.0,-30.0,0.0,0.0,0.0]
+log_message(1,"UF TEST START")
+set_tool_id(0)
+set_user_frame_id(0)
+movj(p_home_location,0,40,720,0)
+# ---- A: does reading the pose depend on the selected user frame? ----
+set_user_frame_id(0)
+sleep(0.3)
+uf_a0 = get_atl_tcp_pose()
+uf_k0 = kine_forward(p_home_location)
+set_user_frame_id(7)
+sleep(0.3)
+uf_a7 = get_atl_tcp_pose()
+uf_k7 = kine_forward(p_home_location)
+uf_xu = (0.7056980154 * (uf_a0[0] - 345.833) + 0.7085118376 * (uf_a0[1] + 489.782) + 0.0011344638 * (uf_a0[2] + 136.233))
+uf_yu = (-0.7085100607 * (uf_a0[0] - 345.833) + 0.7056988446 * (uf_a0[1] + 489.782) + -0.0016231544 * (uf_a0[2] + 136.233))
+if(uf_a7[0] - uf_a0[0] < 1.5 && uf_a7[0] - uf_a0[0] > -1.5 && uf_a7[1] - uf_a0[1] < 1.5 && uf_a7[1] - uf_a0[1] > -1.5):
+    log_message(1,"A1 GET_ATL_TCP_POSE IGNORES USER FRAME - ALWAYS BASE")
+elif(uf_a7[0] - uf_xu < 1.5 && uf_a7[0] - uf_xu > -1.5 && uf_a7[1] - uf_yu < 1.5 && uf_a7[1] - uf_yu > -1.5):
+    log_message(1,"A1 GET_ATL_TCP_POSE FOLLOWS SELECTED USER FRAME - FORMULA MATCHES FRAME 7")
+else:
+    log_message(1,"A1 GET_ATL_TCP_POSE CHANGES BUT NOT LIKE THE FORMULA - CHECK FRAME 7 VALUES")
+end
+if(uf_k7[0] - uf_k0[0] < 1.5 && uf_k7[0] - uf_k0[0] > -1.5 && uf_k7[1] - uf_k0[1] < 1.5 && uf_k7[1] - uf_k0[1] > -1.5):
+    log_message(1,"A2 KINE_FORWARD IGNORES USER FRAME - ALWAYS BASE")
+elif(uf_k7[0] - uf_xu < 1.5 && uf_k7[0] - uf_xu > -1.5 && uf_k7[1] - uf_yu < 1.5 && uf_k7[1] - uf_yu > -1.5):
+    log_message(1,"A2 KINE_FORWARD FOLLOWS SELECTED USER FRAME")
+else:
+    log_message(1,"A2 KINE_FORWARD CHANGES BUT NOT LIKE THE FORMULA")
+end
+# ---- B: relative MoveL rel_flag 1 = along the selected user frame. Always read in frame 0 to compare. ----
+set_user_frame_id(0)
+sleep(0.3)
+uf_s = get_atl_tcp_pose()
+log_message(1,"B1 MOVEL REL X PLUS 50 IN USER FRAME 0")
+movl(uf_dx50,1,30,200,0)
+uf_e = get_atl_tcp_pose()
+uf_dx = (uf_e[0] - uf_s[0])
+uf_dy = (uf_e[1] - uf_s[1])
+if(uf_dx < 51.500 && uf_dx > 48.500 && uf_dy < 1.500 && uf_dy > -1.500):
+    log_message(1,"B1 FRAME 0 REL X MOVES ALONG BASE X")
+elif(uf_dx < 36.785 && uf_dx > 33.785 && uf_dy < 36.926 && uf_dy > 33.926):
+    log_message(1,"B1 FRAME 0 REL X MOVES ALONG USER X - UNEXPECTED")
+else:
+    log_message(1,"B1 FRAME 0 REL X MOVES IN ANOTHER DIRECTION")
+end
+movl(uf_dxm50,1,30,200,0)
+set_user_frame_id(7)
+sleep(0.3)
+log_message(1,"B2 MOVEL REL X PLUS 50 IN USER FRAME 7")
+movl(uf_dx50,1,30,200,0)
+set_user_frame_id(0)
+sleep(0.3)
+uf_e = get_atl_tcp_pose()
+uf_dx = (uf_e[0] - uf_s[0])
+uf_dy = (uf_e[1] - uf_s[1])
+if(uf_dx < 36.785 && uf_dx > 33.785 && uf_dy < 36.926 && uf_dy > 33.926):
+    log_message(1,"B2 FRAME 7 REL X MOVES ALONG USER X - 45 DEG IN BASE")
+elif(uf_dx < 51.500 && uf_dx > 48.500 && uf_dy < 1.500 && uf_dy > -1.500):
+    log_message(1,"B2 FRAME 7 REL X STILL MOVES ALONG BASE X")
+else:
+    log_message(1,"B2 FRAME 7 REL X MOVES IN ANOTHER DIRECTION")
+end
+set_user_frame_id(7)
+movl(uf_dxm50,1,30,200,0)
+# ---- C: relative MoveL rel_flag 2 = along the TOOL axes; Z+ of the tool may not be vertical ----
+set_user_frame_id(0)
+sleep(0.3)
+uf_s = get_atl_tcp_pose()
+log_message(1,"C1 MOVEL REL TOOL Z PLUS 30")
+movl(uf_dz30,2,30,200,0)
+uf_e = get_atl_tcp_pose()
+uf_dz = (uf_e[2] - uf_s[2])
+if(uf_dz < 31.500 && uf_dz > 28.500):
+    log_message(1,"C1 TOOL Z POINTS UP - SAME AS BASE Z")
+elif(uf_dz < -28.500 && uf_dz > -31.500):
+    log_message(1,"C1 TOOL Z POINTS DOWN - OPPOSITE TO BASE Z")
+else:
+    log_message(1,"C1 TOOL Z IS TILTED - TCP ALSO MOVED SIDEWAYS")
+end
+movl(uf_dzm30,2,30,200,0)
+set_user_frame_id(7)
+movj(p_home_location,0,40,720,0)
+log_message(1,"UF TEST END - USER FRAME 7 TOOL 0 LEFT SELECTED")
