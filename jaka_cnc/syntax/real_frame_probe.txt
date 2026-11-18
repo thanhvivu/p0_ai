@@ -1,0 +1,17 @@
+# REAL ROBOT SAFE - NO MOTION, NO SETTING CHANGE. Which user frame / tool is active while running?
+# Put it as the first Sub in the same drag-and-drop frame as the main program, run once, read the log.
+# Reference: Pick TCP read on the teach screen with usrfr_thanh + tool_thanh = [683.786,1237.165,330.754].
+probe_p_pick = [-62.566,144.864,23.441,190.741,-197.648,-45.829]
+probe_k = kine_forward(probe_p_pick)
+if(probe_k[0] > 400.0):
+    log_message(1,"PROBE ACTIVE FRAME = USRFR_THANH 7 - TCP IS ALREADY USER X Y")
+elif(probe_k[0] < 200.0 && probe_k[0] > -300.0):
+    log_message(1,"PROBE ACTIVE FRAME = BASE 0 - CONVERSION FORMULA NEEDED")
+else:
+    log_message(1,"PROBE ACTIVE FRAME UNKNOWN")
+end
+if(probe_k[0] - 683.786 < 3.0 && probe_k[0] - 683.786 > -3.0 && probe_k[1] - 1237.165 < 3.0 && probe_k[1] - 1237.165 > -3.0 && probe_k[2] - 330.754 < 3.0 && probe_k[2] - 330.754 > -3.0):
+    log_message(1,"PROBE USRFR_THANH AND TOOL_THANH CONFIRMED WITHIN 3 MM")
+else:
+    log_message(1,"PROBE PICK TCP DIFFERS FROM TEACH SCREEN - FRAME OR TOOL NOT THANH")
+end

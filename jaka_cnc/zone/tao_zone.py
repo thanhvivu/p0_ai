@@ -3,7 +3,8 @@
 # usage: python tao_zone.py ../jamaguchi_cnc36.txt .
 import re, sys
 main_src, outdir = sys.argv[1], sys.argv[2]
-init=['# X_user / Y_user = TCP converted from Base to usrfr_thanh [345.833,-489.782,-136.233, Rz 45.114].',
+init=['# The robot runs with user frame usrfr_thanh (id 7) + tool_thanh (id 1): get_atl_tcp_pose()',
+'# already returns X/Y in usrfr_thanh (verified 2026-11-19), so no conversion formula.',
 '# Thresholds (usrfr_thanh, tool_thanh): DoorC1 X 679.362, DoorC2 X -365.358, Pick Y 1237.165 - 50.',
 'zone_door_margin = 20.0',
 'zone_x1 = (679.362 + zone_door_margin)',
@@ -11,8 +12,8 @@ init=['# X_user / Y_user = TCP converted from Base to usrfr_thanh [345.833,-489.
 'zone_y_pick_limit = 1187.165',
 'zone_odd_last = -1','zone_even_last = -1','zone_pick_last = -1']
 check=['zone_t = get_atl_tcp_pose()',
-'zone_xu = (0.7056980154 * (zone_t[0] - 345.833) + 0.7085118376 * (zone_t[1] + 489.782) + 0.0011344638 * (zone_t[2] + 136.233))',
-'zone_yu = (-0.7085100607 * (zone_t[0] - 345.833) + 0.7056988446 * (zone_t[1] + 489.782) - 0.0016231544 * (zone_t[2] + 136.233))',
+'zone_xu = zone_t[0]',
+'zone_yu = zone_t[1]',
 'zone_odd = 0','zone_even = 0','zone_pick = 0',
 'if(zone_xu > zone_x1):','    zone_odd = 1','end',
 'if(zone_xu < zone_x2):','    zone_even = 1','end',
@@ -34,7 +35,7 @@ def ok(lines):
 mon=['# ZONE_MONITOR - run as Sub-thread1 from the main program. No motion commands.',
 '# DO56 = TCP past DoorC1 + margin (odd CNC side), DO57 = past DoorC2 + margin (even CNC side),',
 '# DO58 = TCP within 50 mm of the Pick point along Y_user or beyond. Warning only, not safety.']+init+[
-'log_message(1,"ZONE MONITOR STARTED MARGIN 20 PICK Y 1187")','while(1):']+['    '+x for x in check]+['    sleep(0.05)','end','']
+'log_message(1,"ZONE MONITOR STARTED USER FRAME 7 MARGIN 20 PICK Y 1187")','while(1):']+['    '+x for x in check]+['    sleep(0.05)','end','']
 ok(mon); open(outdir+'/zone_monitor.txt','w',newline='').write('\r\n'.join(mon))
 simmon=['# !!! SIMULATION ONLY !!! zone_monitor without DO writes; run as Sub-thread1 next to sim_main_simple.']+[
     (x[:len(x)-len(x.lstrip())]+'sleep(0.01)') if x.strip().startswith('set_digital_output(') else x for x in mon]

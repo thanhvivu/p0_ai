@@ -388,3 +388,14 @@ Chuẩn bị: giữ `jamaguchi_cnc36.txt` trên bộ điều khiển (tên khác
 * `movl(...,1,...)` dịch theo trục của user frame đang chọn (hệ 0: trục base; hệ 7: chéo 45° = trục user). Đúng tài liệu.
 * `movl(...,2,...)` dịch theo trục tool (tool 0 ở Home: trục Z nghiêng).
 * Giá trị đọc ở hệ 7 chưa khớp công thức trong ±1,5 mm (góc xoay thì khớp) → đang đo mức lệch: `syntax/sim_userframe_learn2.txt`.
+
+## 24. Robot thật chạy với usrfr_thanh (id 7) + tool_thanh (id 1) – hệ quả (2026-11-19)
+
+* `get_atl_tcp_pose()` đã trả về X/Y theo usrfr_thanh → công thức Base→user là **đổi hệ hai lần**.
+* `zone_monitor`: đã bỏ công thức, so thẳng `zone_t[0]`, `zone_t[1]`.
+* **Vùng nguy hiểm khi Home (code gốc)**: với đầu vào đã là tọa độ user, công thức cho kết quả sai –
+  vùng CNC2 gần như không bao giờ được nhận ra, vùng CNC1 chỉ một phần. Robot dừng **lưng chừng**
+  (không khớp điểm teach) trong CNC2 + DI90 → rơi xuống AI16 → MoveJ thẳng ra cửa, không qua Wait.
+  Nhận diện điểm teach (±20 mm, ±5°) không bị ảnh hưởng.
+  → Đề xuất sửa: so thẳng `home_actual_tcp[0]`, `home_actual_tcp[1]` với ranh giới (sau khi xác nhận bằng
+  `syntax/real_frame_probe.txt` trên máy thật).
