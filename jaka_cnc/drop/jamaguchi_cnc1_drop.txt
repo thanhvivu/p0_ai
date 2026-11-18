@@ -1,0 +1,3330 @@
+# [DROP] Separate program: CNC1 cycle (P2) + P7 Case1 drops the unloaded part outside.
+# [CNC36] 2026-11: extended for CNC3..CNC6 (P3 = CNC3/CNC4, P4 = CNC5/CNC6).
+#   Search "[CNC36]" for every change. Motion code is shared; only the point set changes.
+#   CNC3..CNC6 points (incl. Door) are PLACEHOLDER copies of CNC1/CNC2 and must be re-taught.
+#   Home keep-J6 Door moves read J1..J5 from p_odd_door/p_even_door (verify on first load).
+#
+# FULL PROCESS 1-10 - EMBEDDED IO MODBUS
+# Source: MapRobotCobot.xlsx (Desktop, 2026-09-04)
+# Input logic: active HIGH
+# JAKA Modbus namespace: type 4
+# Address rule: DI_n or DO_n uses zero-based index n-1
+#
+# Common:
+# DI16 idx15 = Process Exit Request
+# DI17 idx16 = Complete Return / leave current Case
+# DI90 idx89 = Home Process Request / MoveHomePosition
+# AI16 idx15 = CNC number used as the fallback Home door selector
+# DO16 idx15 = Robot Home
+# DO17 idx16 = Process Exit Complete
+#
+# Process conditions and interlocks:
+# DI18..DI27 idx17..26 = P1..P10 Condition
+# DO18..DO27 idx17..26 = P1..P10 Interlock
+#
+# Implemented Case pairs from the new map:
+# P1: DI28/DO28
+# P2: DI30..DI33 / DO30..DO33
+# P3: DI35..DI38 / DO35..DO38
+# P4: DI40..DI43 / DO40..DO43
+# P5: DI45..DI46 / DO45..DO46
+# P6: DI48..DI51 / DO48..DO51
+# P7: DI53/DO53
+# P8: DI55/DO55 used for Case 1 Change Tool
+# P9/P10: no Case mapped
+
+active_process = 0
+door_select = -1
+last_door_select = 0
+process_idx = 0
+active_case = 0
+last_completed_case = 0
+case_completed = 0
+exit_latched = 0
+home_latched = 0
+at_c1_load_wait = 0
+at_c1_load = 0
+at_c1_load_end = 0
+at_c1_unload_wait = 0
+at_c1_unload = 0
+at_load_m2_wait = 0
+at_load_m2 = 0
+at_end_load_m2 = 0
+at_unload_m2_wait = 0
+at_unload_m2 = 0
+at_air_c2 = 0
+home_route_door_done = 0
+home_route_hint = 0
+home_already_home = 0
+startup_scan = 1
+
+# AI_3 Modbus (index 2) controls normal motion speed.
+# Use literal stepped values because this controller rejects arithmetic
+# expressions in some variable-assignment commands.
+# All MoveL motions use 30 mm/s.
+# before chuck clamp. Cylinder handshakes DO62/DI62 and DO63/DI63 are unused.
+ai3_speed_raw = 0
+speed_movej = 40
+speed_movel = 30
+# Faster profile for doors, intermediate points, wait points and free-space travel.
+# Fast MoveJ uses acceleration 720. Fast MoveL uses acceleration 3500.
+# Precision/action motions stay at 200.
+speed_movej_fast = 55
+speed_movel_fast = 30
+# CNC1 load positions: +0.1 mm along the active User-frame X axis.
+p_c1_user_x_offset = [-0.2,0,0.2,0,0,0]
+# CNC2 load positions: edit the first value to change the User-frame X offset.
+p_c2_user_x_offset = [0.0,0,0.0,0,0,0]
+# [CNC36] CNC3..CNC6 fine offsets in the active User frame (same meaning as CNC1/CNC2).
+p_c3_user_x_offset = [0.0,0,0.0,0,0,0]
+p_c4_user_x_offset = [0.0,0,0.0,0,0,0]
+p_c5_user_x_offset = [0.0,0,0.0,0,0,0]
+p_c6_user_x_offset = [0.0,0,0.0,0,0,0]
+
+# ===== TAUGHT JOINT POINTS =====
+# pickwwait - taught joint point from CobotStudio
+p_pick_true_axis = [-62.562,148.695,10.785,199.567,-197.644,-45.829]
+# pick - taught joint point from CobotStudio
+p_pick = [-62.566,144.864,23.441,190.741,-197.648,-45.829]
+# HomeLocation - copied from CobotStudio Position Variable
+p_home_location = [-43.100,56.711,106.885,194.140,-264.961,48.660]
+
+# Process6Safe TEMP - replace with the taught Process6Safe joint point later
+# Temporarily uses HomeLocation to avoid using an arbitrary unverified robot pose
+p_process6_safe = [-43.100,56.711,106.885,194.140,-264.961,48.660]
+# Process6Put1 = taught point bavia
+p_process6_put1 = [-19.220,129.251,53.818,176.378,-244.126,-226.929]
+# Process6Put1Safe = taught point bavia_wait
+p_process6_put1_safe = [-19.260,129.153,49.955,180.339,-244.165,-226.929]
+
+# Process 2 Case 1 - Load CNC1
+p_door_c1 = [-126.687,83.807,112.098,163.645,-261.426,-44.917]
+p_door_c2 = [82.806,67.797,128.293,165.476,-230.174,-49.001]
+# Only DI90 Home routes preserve current J6 when moving to a Door.
+# Normal Process entry and DI16 Process exit still use the fully taught Door joint point.
+# CNC1 danger-boundary TCP references; runtime Home logic uses their Y range and DoorC1 X.
+# P1 TCP = [679.362,755.117,268.781,85.426,-44.094,91.619]
+# P2 TCP = [679.362,496.706,265.455,87.738,-42.479,92.263]
+# CNC2 danger-boundary TCP references; runtime Home logic uses their Y range and DoorC2 X.
+# P1 TCP = [-365.358,568.492,319.504,79.654,-36.745,-87.583]
+# P2 TCP = [-365.358,321.336,337.328,86.882,-38.982,-93.748]
+p_air_switch_tool = [-134.333,142.075,36.696,180.755,-269.211,-44.855]
+
+# AirC1v1 - additional CNC1 air point.
+p_air_c1v1 = [-134.312, 136.943, 45.580, 177.004, -269.190, -44.856]
+
+p_air_c2 = [55.659,126.993,65.379,166.557,-258.042,-47.170]
+# AirC2v1 = taught joint point from CobotStudio screenshot
+p_air_c2v1 = [56.198,122.439,71.850,164.637,-257.503,-47.180]
+# Updated taught positions for CNC1 Load. - [CNC36] C1Load/C1LoadWait/C1LoadEnd re-taught 2026-11-17
+p_c1_load = [-132.986,139.577,40.211,180.850,-267.475,44.088]
+p_c1_load_wait = [-138.586,142.271,35.057,183.311,-273.075,44.026]
+p_c1_load_end = [-132.739,139.496,40.365,180.778,-267.228,44.091]
+
+# Process 2 Case 2 - Unload CNC1, J6 = original J6 + 180 degrees
+p_c1_unload_wait = [-138.163,142.907,33.696,184.325,-275.438,-135.035]
+p_c1_unload = [-133.563,140.802,37.750,182.372,-270.839,-134.961]
+# C1UnloadDown - retreat point after DI64 clamp confirmation
+p_c1_unload_down = [-133.561,140.586,38.163,182.176,-270.837,-134.961]
+
+# Process 2 Case 3 - Load CNC2 (model 2 taught positions) - [CNC36] LoadM2_Wait/LoadC2/EndLoadM2v1 re-taught 2026-11
+p_load_m2_wait = [50.754,126.156,66.822,165.907,-262.992,44.342]
+# LoadC2: release Tool Load before entering EndLoadM2v1
+p_load_c2 = [56.882,125.825,67.368,165.670,-256.865,44.220]
+# EndLoadM2v1 - updated from the latest taught position.
+p_end_load_m2v1 = [57.156,125.834,67.352,165.676,-256.592,44.214]
+p_end_load_m2v2 = [57.088,126.289,65.170,169.400,-256.938,44.672]
+# EndLoadM2v1/v2 are retained for Home recognition only while Case 3 is simplified.
+# Relative Cartesian retreat after loading even-numbered CNC: X -20 mm in user frame
+
+# Process 2 Case 4 - Unload CNC2, J6 = original J6 + 180 degrees
+p_unload_m2_wait = [51.507,126.321,64.645,170.483,-262.240,-135.484]
+p_unload_m2 = [57.266,126.106,64.997,170.375,-256.483,-135.334]
+
+# ===== [CNC36] CNC3..CNC6 TAUGHT POINTS =====
+# The robot base rides on Axis1 (moved by PLC): Pos1 = CNC1/2, Pos2 = CNC3/4, Pos3 = CNC5/6.
+# Joint points are relative to the robot base. If Axis1 stops at exactly the same relative
+# position in front of every pair, the CNC1/CNC2 values could be reused unchanged.
+# !!! PLACEHOLDER: every value below is a COPY of CNC1 (odd side) or CNC2 (even side). !!!
+# !!! Re-teach / verify each point on the real machine before running at normal speed. !!!
+# Door points (robot posture in the aisle in front of each CNC pair) - PLACEHOLDER
+# DoorC3/DoorC5 copy DoorC1 (odd side), DoorC4/DoorC6 copy DoorC2 (even side).
+# copy of p_door_c1
+p_door_c3 = [-126.687,83.807,112.098,163.645,-261.426,-44.917]
+# copy of p_door_c2
+p_door_c4 = [82.806,67.797,128.293,165.476,-230.174,-49.001]
+# copy of p_door_c1
+p_door_c5 = [-126.687,83.807,112.098,163.645,-261.426,-44.917]
+# copy of p_door_c2
+p_door_c6 = [82.806,67.797,128.293,165.476,-230.174,-49.001]
+
+# CNC3 (P3 Case1/Case2, odd side like CNC1) - PLACEHOLDER
+# copy of p_air_c1v1
+p_c3_air_v1 = [-134.312, 136.943, 45.580, 177.004, -269.190, -44.856]
+# copy of p_air_switch_tool
+p_c3_air_switch_tool = [-134.333,142.075,36.696,180.755,-269.211,-44.855]
+# copy of p_c1_load_wait
+p_c3_load_wait = [-138.586,142.271,35.057,183.311,-273.075,44.026]
+# copy of p_c1_load
+p_c3_load = [-132.986,139.577,40.211,180.850,-267.475,44.088]
+# copy of p_c1_load_end
+p_c3_load_end = [-132.739,139.496,40.365,180.778,-267.228,44.091]
+# copy of p_c1_unload_wait
+p_c3_unload_wait = [-138.163,142.907,33.696,184.325,-275.438,-135.035]
+# copy of p_c1_unload
+p_c3_unload = [-133.563,140.802,37.750,182.372,-270.839,-134.961]
+# copy of p_c1_unload_down
+p_c3_unload_down = [-133.561,140.586,38.163,182.176,-270.837,-134.961]
+
+# CNC4 (P3 Case3/Case4, even side like CNC2) - PLACEHOLDER
+# copy of p_air_c2v1
+p_c4_air_v1 = [56.198,122.439,71.850,164.637,-257.503,-47.180]
+# copy of p_air_c2
+p_c4_air = [55.659,126.993,65.379,166.557,-258.042,-47.170]
+# copy of p_load_m2_wait
+p_c4_load_wait = [50.754,126.156,66.822,165.907,-262.992,44.342]
+# copy of p_load_c2
+p_c4_load = [56.882,125.825,67.368,165.670,-256.865,44.220]
+# copy of p_end_load_m2v1
+p_c4_load_end = [57.156,125.834,67.352,165.676,-256.592,44.214]
+# copy of p_unload_m2_wait
+p_c4_unload_wait = [51.507,126.321,64.645,170.483,-262.240,-135.484]
+# copy of p_unload_m2
+p_c4_unload = [57.266,126.106,64.997,170.375,-256.483,-135.334]
+
+# CNC5 (P4 Case1/Case2, odd side like CNC1) - PLACEHOLDER
+# copy of p_air_c1v1
+p_c5_air_v1 = [-134.312, 136.943, 45.580, 177.004, -269.190, -44.856]
+# copy of p_air_switch_tool
+p_c5_air_switch_tool = [-134.333,142.075,36.696,180.755,-269.211,-44.855]
+# copy of p_c1_load_wait
+p_c5_load_wait = [-138.586,142.271,35.057,183.311,-273.075,44.026]
+# copy of p_c1_load
+p_c5_load = [-132.986,139.577,40.211,180.850,-267.475,44.088]
+# copy of p_c1_load_end
+p_c5_load_end = [-132.739,139.496,40.365,180.778,-267.228,44.091]
+# copy of p_c1_unload_wait
+p_c5_unload_wait = [-138.163,142.907,33.696,184.325,-275.438,-135.035]
+# copy of p_c1_unload
+p_c5_unload = [-133.563,140.802,37.750,182.372,-270.839,-134.961]
+# copy of p_c1_unload_down
+p_c5_unload_down = [-133.561,140.586,38.163,182.176,-270.837,-134.961]
+
+# CNC6 (P4 Case3/Case4, even side like CNC2) - PLACEHOLDER
+# copy of p_air_c2v1
+p_c6_air_v1 = [56.198,122.439,71.850,164.637,-257.503,-47.180]
+# copy of p_air_c2
+p_c6_air = [55.659,126.993,65.379,166.557,-258.042,-47.170]
+# copy of p_load_m2_wait
+p_c6_load_wait = [50.754,126.156,66.822,165.907,-262.992,44.342]
+# copy of p_load_c2
+p_c6_load = [56.882,125.825,67.368,165.670,-256.865,44.220]
+# copy of p_end_load_m2v1
+p_c6_load_end = [57.156,125.834,67.352,165.676,-256.592,44.214]
+# copy of p_unload_m2_wait
+p_c6_unload_wait = [51.507,126.321,64.645,170.483,-262.240,-135.484]
+# copy of p_unload_m2
+p_c6_unload = [57.266,126.106,64.997,170.375,-256.483,-135.334]
+
+# ===== [CNC36] ACTIVE CNC POINT SET =====
+# Case motion (cnc_motion_case 29..32) and DI90 Home recovery use only p_odd_* / p_even_*.
+# They are reloaded from cnc_pair at every P2/P3/P4 Case and at every DI90 Home request.
+cnc_pair = 1
+cnc_pos_ai16 = 0
+cnc_pos_pair = 0
+cnc_pos_mismatch = 0
+# [CNC36] Load the active CNC point set (p_odd_* / p_even_*) from cnc_pair.
+if(cnc_pair == 1):
+    p_odd_door = p_door_c1
+    p_even_door = p_door_c2
+    p_odd_user_x_offset = p_c1_user_x_offset
+    p_odd_air_v1 = p_air_c1v1
+    p_odd_air_switch_tool = p_air_switch_tool
+    p_odd_load_wait = p_c1_load_wait
+    p_odd_load = p_c1_load
+    p_odd_load_end = p_c1_load_end
+    p_odd_unload_wait = p_c1_unload_wait
+    p_odd_unload = p_c1_unload
+    p_odd_unload_down = p_c1_unload_down
+    p_even_user_x_offset = p_c2_user_x_offset
+    p_even_air_v1 = p_air_c2v1
+    p_even_air = p_air_c2
+    p_even_load_wait = p_load_m2_wait
+    p_even_load = p_load_c2
+    p_even_load_end = p_end_load_m2v1
+    p_even_unload_wait = p_unload_m2_wait
+    p_even_unload = p_unload_m2
+end
+if(cnc_pair == 2):
+    p_odd_door = p_door_c3
+    p_even_door = p_door_c4
+    p_odd_user_x_offset = p_c3_user_x_offset
+    p_odd_air_v1 = p_c3_air_v1
+    p_odd_air_switch_tool = p_c3_air_switch_tool
+    p_odd_load_wait = p_c3_load_wait
+    p_odd_load = p_c3_load
+    p_odd_load_end = p_c3_load_end
+    p_odd_unload_wait = p_c3_unload_wait
+    p_odd_unload = p_c3_unload
+    p_odd_unload_down = p_c3_unload_down
+    p_even_user_x_offset = p_c4_user_x_offset
+    p_even_air_v1 = p_c4_air_v1
+    p_even_air = p_c4_air
+    p_even_load_wait = p_c4_load_wait
+    p_even_load = p_c4_load
+    p_even_load_end = p_c4_load_end
+    p_even_unload_wait = p_c4_unload_wait
+    p_even_unload = p_c4_unload
+end
+if(cnc_pair == 3):
+    p_odd_door = p_door_c5
+    p_even_door = p_door_c6
+    p_odd_user_x_offset = p_c5_user_x_offset
+    p_odd_air_v1 = p_c5_air_v1
+    p_odd_air_switch_tool = p_c5_air_switch_tool
+    p_odd_load_wait = p_c5_load_wait
+    p_odd_load = p_c5_load
+    p_odd_load_end = p_c5_load_end
+    p_odd_unload_wait = p_c5_unload_wait
+    p_odd_unload = p_c5_unload
+    p_odd_unload_down = p_c5_unload_down
+    p_even_user_x_offset = p_c6_user_x_offset
+    p_even_air_v1 = p_c6_air_v1
+    p_even_air = p_c6_air
+    p_even_load_wait = p_c6_load_wait
+    p_even_load = p_c6_load
+    p_even_load_end = p_c6_load_end
+    p_even_unload_wait = p_c6_unload_wait
+    p_even_unload = p_c6_unload
+end
+
+
+# Process 5 Case 1 - Put Down Clean Unit
+p_clean_position_wait = [93.491,37.630,-55.238,18.328,-133.815,135.255]
+p_clean_position = [93.726,34.536,-64.383,29.319,-133.809,135.219]
+
+# Process 7 Case 1 - Put Down Inspection Unit
+p_process7_unload_wait = [-11.733,120.850,92.117,148.195,-265.255,135.530]
+p_process7_unload = [-11.734,134.268,97.282,129.613,-265.256,135.530]
+# Joint envelope between Process7Unload and Process7UnloadWait, including +/-5 degrees.
+p_process7_unload_segment_min = [-16.734,115.850,87.117,124.613,-270.256,130.530]
+p_process7_unload_segment_max = [-6.733,139.268,102.282,153.195,-260.255,140.530]
+
+# ===== [DROP] P7 Case1 = drop the part unloaded from CNC1 at an outside point =====
+# !!! PLACEHOLDER: p_drop is a COPY of p_process7_unload. Replace with the taught drop point
+# !!! (Tool Unload holding the part, at the release height).
+p_drop = [-11.734,134.268,97.282,129.613,-265.256,135.530]
+# Approach / lift height above the drop point: +100 mm Z.
+p_drop_up_offset = [0.0,0.0,100.0,0.0,0.0,0.0]
+p_drop_pose = kine_forward(p_drop)
+p_drop_above_pose = pose_add(p_drop_pose,p_drop_up_offset)
+p_drop_above_joint = kine_inverse(p_drop,p_drop_above_pose)
+drop_ok = 0
+
+# Process 8 Case 1 - Change Tool - [CNC36] Load_daotool_Wait/Load_daotool re-taught 2026-11 (Z 355.4 -> 325.4)
+p_load_daotool_wait = [-5.321,90.910,100.547,165.270,-140.056,-48.007]
+p_load_daotool = [-5.320,91.879,104.347,160.501,-140.055,-48.007]
+p_trunggian_unload = [-13.614,106.581,53.951,195.463,-148.333,-48.906]
+p_unload_daotool_wait = [-53.210,77.391,102.652,91.290,-89.672,-323.161]
+p_unload_daotool = [-53.520,77.575,108.245,85.260,-89.523,-323.554]
+# Joint envelopes for DI90 Home recognition along each tool-change segment.
+# Each envelope covers both endpoints plus the same +/-5 degree tolerance.
+p_load_daotool_segment_min = [-10.321,85.910,95.547,155.501,-145.056,-53.007]
+p_load_daotool_segment_max = [-0.320,96.879,109.347,170.270,-135.055,-43.007]
+p_unload_daotool_segment_min = [-58.520,72.391,97.652,80.260,-94.672,-328.554]
+p_unload_daotool_segment_max = [-48.210,82.575,113.245,96.290,-84.523,-318.161]
+
+# Precomputed joint limits for Home route recognition.
+# These literal arrays avoid arithmetic assignments, which this controller rejects.
+# Each lower/upper pair is the taught joint point minus/plus 5 degrees.
+p_c1_load_end_min = [-137.529,135.563,31.564,181.063,-272.018,39.198]
+p_c1_load_end_max = [-127.529,145.563,41.564,191.063,-262.018,49.198]
+p_c1_load_min = [-137.923,135.700,31.303,181.186,-272.411,39.176]
+p_c1_load_max = [-127.923,145.700,41.303,191.186,-262.411,49.176]
+p_c1_load_wait_min = [-143.586,138.680,25.546,183.964,-278.065,38.861]
+p_c1_load_wait_max = [-133.586,148.680,35.546,193.964,-268.065,48.861]
+p_c1_unload_min = [-138.563,135.802,32.750,177.372,-275.839,-139.961]
+p_c1_unload_max = [-128.563,145.802,42.750,187.372,-265.839,-129.961]
+p_c1_unload_wait_min = [-143.163,137.907,28.696,179.325,-280.438,-140.035]
+p_c1_unload_wait_max = [-133.163,147.907,38.696,189.325,-270.438,-130.035]
+p_c1_unload_down_min = [-138.561,135.586,33.163,177.176,-275.837,-139.961]
+p_c1_unload_down_max = [-128.561,145.586,43.163,187.176,-265.837,-129.961]
+p_end_load_m2v2_min = [52.088,121.289,60.170,164.400,-261.938,39.672]
+p_end_load_m2v2_max = [62.088,131.289,70.170,174.400,-251.938,49.672]
+p_end_load_m2v1_min = [51.678,121.378,59.477,165.783,-263.123,39.833]
+p_end_load_m2v1_max = [61.678,131.378,69.477,175.783,-253.123,49.833]
+p_load_m2_wait_min = [45.293,121.775,58.817,166.018,-269.506,39.650]
+p_load_m2_wait_max = [55.293,131.775,68.817,176.018,-259.506,49.650]
+p_load_c2_min = [51.589,121.376,59.481,165.780,-263.211,39.831]
+p_load_c2_max = [61.589,131.376,69.481,175.780,-253.211,49.831]
+p_unload_m2_min = [52.266,121.106,59.997,165.375,-261.483,-140.334]
+p_unload_m2_max = [62.266,131.106,69.997,175.375,-251.483,-130.334]
+p_unload_m2_wait_min = [46.507,121.321,59.645,165.483,-267.240,-140.484]
+p_unload_m2_wait_max = [56.507,131.321,69.645,175.483,-257.240,-130.484]
+p_air_c2_min = [50.659,121.993,60.379,161.557,-263.042,-52.170]
+p_air_c2_max = [60.659,131.993,70.379,171.557,-253.042,-42.170]
+p_door_c1_min = [-131.687,78.807,107.098,158.645,-266.426,-49.917]
+p_door_c1_max = [-121.687,88.807,117.098,168.645,-256.426,-39.917]
+p_door_c2_min = [77.806,62.797,123.293,160.476,-235.174,-54.001]
+p_door_c2_max = [87.806,72.797,133.293,170.476,-225.174,-44.001]
+p_home_location_min = [-48.100,51.711,101.885,189.140,-269.961,43.660]
+p_home_location_max = [-38.100,61.711,111.885,199.140,-259.961,53.660]
+
+# Reset common and Process interlock outputs
+# DO16 idx15 = Robot Home status
+set_digital_output(4,15,0,1)
+set_digital_output(4,16,0,1)
+# AO2 idx1 = current Process number, 0 means no numbered Process
+set_analog_output(4,1,0,1)
+set_digital_output(4,17,0,1)
+set_digital_output(4,18,0,1)
+set_digital_output(4,19,0,1)
+set_digital_output(4,20,0,1)
+set_digital_output(4,21,0,1)
+set_digital_output(4,22,0,1)
+set_digital_output(4,23,0,1)
+set_digital_output(4,24,0,1)
+set_digital_output(4,25,0,1)
+set_digital_output(4,26,0,1)
+
+# Reset mapped Case-complete outputs
+set_digital_output(4,27,0,1)
+set_digital_output(4,29,0,1)
+set_digital_output(4,30,0,1)
+set_digital_output(4,31,0,1)
+set_digital_output(4,32,0,1)
+set_digital_output(4,34,0,1)
+set_digital_output(4,35,0,1)
+set_digital_output(4,36,0,1)
+set_digital_output(4,37,0,1)
+set_digital_output(4,39,0,1)
+set_digital_output(4,40,0,1)
+set_digital_output(4,41,0,1)
+set_digital_output(4,42,0,1)
+set_digital_output(4,44,0,1)
+set_digital_output(4,45,0,1)
+set_digital_output(4,47,0,1)
+set_digital_output(4,48,0,1)
+set_digital_output(4,49,0,1)
+set_digital_output(4,50,0,1)
+set_digital_output(4,52,0,1)
+set_digital_output(4,54,0,1)
+# DO60 idx59 = Request Clamp Tool Load1
+set_digital_output(4,59,0,1)
+# DO62 and DO63 are unused; force them OFF during program reset for safety.
+set_digital_output(4,60,0,1)
+set_digital_output(4,61,0,1)
+set_digital_output(4,62,0,1)
+# DO64 idx63 = Request Clamp Cylinder Tool Unload
+set_digital_output(4,63,0,1)
+# DO65 idx64 = Request Unclamp Tool Unload
+set_digital_output(4,64,0,1)
+# DO66 idx65 = Request Clamp Change Tool
+# DO67 idx66 = Request Unclamp Change Tool
+set_digital_output(4,65,0,1)
+set_digital_output(4,66,0,1)
+# DO68 idx67 = Request Clamp Clean Unit
+set_digital_output(4,67,0,1)
+# DO69 idx68 = Request Unclamp Clean Unit
+set_digital_output(4,68,0,1)
+# DO70 idx69 = Request Clamp Bavia Unit
+set_digital_output(4,69,0,1)
+# DO71 idx70 = Request Unclamp Bavia Unit
+set_digital_output(4,70,0,1)
+# DO72 idx71 = Request Clamp Rotary PD
+set_digital_output(4,71,0,1)
+# DO74 idx73 = Request Air Blow ON
+set_digital_output(4,73,0,1)
+# DO75 idx74 = Request AirC2v1 confirmation
+set_digital_output(4,74,0,1)
+# DO78 idx77 = Request Clamp Chuck CNC
+set_digital_output(4,77,0,1)
+# DO80 idx79 = Request Forward Cylinder Rotary
+set_digital_output(4,79,0,1)
+
+log_message(1,"FULL PROCESS START MODBUS HIGH")
+log_message(1,"WAIT DI90 HOME OR DI18-DI27 PROCESS ON")
+
+while(1):
+    # Refresh normal motion speed from AI_3 at the beginning of every scan.
+    # Expected AI_3 command range: 0..100.
+    ai3_speed_raw = get_analog_input(4,2)
+    if(ai3_speed_raw <= 20):
+        speed_movej = 40
+        speed_movel = 30
+        speed_movej_fast = 55
+        speed_movel_fast = 40
+    else:
+        if(ai3_speed_raw <= 40):
+            speed_movej = 70
+            speed_movel = 50
+            speed_movej_fast = 90
+            speed_movel_fast = 65
+        else:
+            if(ai3_speed_raw <= 60):
+                speed_movej = 100
+                speed_movel = 70
+                speed_movej_fast = 125
+                speed_movel_fast = 90
+            else:
+                if(ai3_speed_raw <= 80):
+                    speed_movej = 120
+                    speed_movel = 85
+                    speed_movej_fast = 150
+                    speed_movel_fast = 105
+                else:
+                    speed_movej = 210
+                    speed_movel = 300
+                    speed_movej_fast = 240
+                    speed_movel_fast = 1800
+                end
+            end
+        end
+    end
+
+    di16 = get_digital_input(4,15)
+    di90 = get_digital_input(4,89)
+
+    # DI16 can exit Process only after DI17 has cleared the active Case.
+    if(active_case > 0):
+        di16 = 0
+    end
+
+    # DI16 - exit current Process only
+    if(di16 == 1):
+        if(exit_latched == 0):
+            exit_home_allowed = 0
+            if(case_completed == 1):
+                exit_home_allowed = 1
+            else:
+                if(active_case == 0):
+                    if(last_completed_case > 0):
+                        exit_home_allowed = 1
+                    end
+                end
+            end
+
+            exit_at_home = 1
+            if(active_process == 2):
+                exit_at_home = 0
+            end
+            if(active_process == 3):
+                exit_at_home = 0
+            end
+            if(active_process == 4):
+                exit_at_home = 0
+            end
+
+            if(exit_home_allowed == 1):
+                log_message(1,"DI16 EXIT PROCESS BY SAFE REVERSE PATH")
+                if(door_select == 1):
+                    log_message(1,"EXIT VIA SELECTED DOORC1")
+                    movj(p_odd_door,0,speed_movej_fast,720,0)
+                    home_route_hint = 0
+                    at_c1_load_wait = 0
+                    at_c1_load = 0
+                    at_c1_load_end = 0
+                    at_c1_unload_wait = 0
+                    at_c1_unload = 0
+                    at_load_m2_wait = 0
+                    at_load_m2 = 0
+                    at_end_load_m2 = 0
+                    at_unload_m2_wait = 0
+                    at_unload_m2 = 0
+                    at_air_c2 = 0
+                end
+                if(door_select == 2):
+                    log_message(1,"EXIT VIA SELECTED DOORC2")
+                    movj(p_even_door,0,speed_movej_fast,720,0)
+                    home_route_hint = 0
+                    at_c1_load_wait = 0
+                    at_c1_load = 0
+                    at_c1_load_end = 0
+                    at_c1_unload_wait = 0
+                    at_c1_unload = 0
+                    at_load_m2_wait = 0
+                    at_load_m2 = 0
+                    at_end_load_m2 = 0
+                    at_unload_m2_wait = 0
+                    at_unload_m2 = 0
+                    at_air_c2 = 0
+                end
+                if(exit_at_home == 1):
+                    movj(p_home_location,0,speed_movej_fast,720,0)
+                    log_message(1,"DI16 HOMELOCATION COMPLETE DO16 ON")
+                else:
+                    log_message(1,"P2 P3 P4 EXIT COMPLETE AT SELECTED DOOR NO HOME MOVE")
+                end
+            else:
+                log_message(2,"DI16 CASE NOT COMPLETE HOME MOVE SKIPPED")
+            end
+
+            if(active_case > 0):
+                set_digital_output(4,active_case,0,1)
+            end
+            set_digital_output(4,17,0,1)
+            set_digital_output(4,18,0,1)
+            set_digital_output(4,19,0,1)
+            set_digital_output(4,20,0,1)
+            set_digital_output(4,21,0,1)
+            set_digital_output(4,22,0,1)
+            set_digital_output(4,23,0,1)
+            set_digital_output(4,24,0,1)
+            set_digital_output(4,25,0,1)
+            set_digital_output(4,26,0,1)
+            set_digital_output(4,59,0,1)
+            set_digital_output(4,60,0,1)
+            set_digital_output(4,61,0,1)
+            set_digital_output(4,62,0,1)
+            set_digital_output(4,63,0,1)
+            set_digital_output(4,64,0,1)
+            set_digital_output(4,65,0,1)
+            set_digital_output(4,66,0,1)
+            set_digital_output(4,67,0,1)
+            set_digital_output(4,68,0,1)
+            set_digital_output(4,69,0,1)
+            set_digital_output(4,70,0,1)
+            set_digital_output(4,71,0,1)
+            set_digital_output(4,74,0,1)
+            set_digital_output(4,77,0,1)
+            set_digital_output(4,79,0,1)
+            active_case = 0
+            active_process = 0
+            door_select = -1
+            process_idx = 0
+            last_completed_case = 0
+            case_completed = 0
+            exit_latched = 1
+            set_analog_output(4,1,0,1)
+            if(exit_home_allowed == 1):
+                if(exit_at_home == 1):
+                    set_digital_output(4,15,1,1)
+                else:
+                    set_digital_output(4,15,0,1)
+                end
+            else:
+                set_digital_output(4,15,0,1)
+            end
+            set_digital_output(4,16,1,1)
+            log_message(2,"DI16 ON EXIT CURRENT PROCESS")
+            log_message(1,"AO2 0 NO ACTIVE PROCESS")
+            log_message(1,"DO17 ON WAIT DI16 OFF")
+        end
+    else:
+        if(exit_latched == 1):
+            set_digital_output(4,16,0,1)
+            exit_latched = 0
+            log_message(1,"DI16 OFF DO17 OFF")
+            log_message(1,"WAIT DI90 HOME OR DI18-DI27 PROCESS ON")
+        end
+
+        # DI90 - HOME PROCESS, independent from Process 1-10
+        if(di90 == 1):
+            active_process = -1
+            if(home_latched == 0):
+                if(active_case == 27):
+                    set_digital_output(4,27,0,1)
+                else:
+                    if(active_case > 0):
+                        set_digital_output(4,active_case,0,1)
+                    end
+                end
+                set_digital_output(4,17,0,1)
+                set_digital_output(4,18,0,1)
+                set_digital_output(4,19,0,1)
+                set_digital_output(4,20,0,1)
+                set_digital_output(4,21,0,1)
+                set_digital_output(4,22,0,1)
+                set_digital_output(4,23,0,1)
+                set_digital_output(4,24,0,1)
+                set_digital_output(4,25,0,1)
+                set_digital_output(4,26,0,1)
+                set_digital_output(4,59,0,1)
+                set_digital_output(4,60,0,1)
+                set_digital_output(4,61,0,1)
+                set_digital_output(4,62,0,1)
+                set_digital_output(4,63,0,1)
+                set_digital_output(4,64,0,1)
+                set_digital_output(4,65,0,1)
+                set_digital_output(4,66,0,1)
+                set_digital_output(4,67,0,1)
+                set_digital_output(4,68,0,1)
+                set_digital_output(4,71,0,1)
+                set_digital_output(4,74,0,1)
+                set_digital_output(4,77,0,1)
+                set_digital_output(4,79,0,1)
+                set_digital_output(4,15,0,1)
+                active_case = 0
+                last_completed_case = 0
+                case_completed = 0
+                active_process = -1
+                process_idx = 0
+                home_latched = 1
+                home_route_door_done = 0
+                home_already_home = 0
+                set_analog_output(4,1,0,1)
+                log_message(1,"CURRENT HOME PROCESS DI90 ON")
+                log_message(1,"AO2 0 HOME PROCESS")
+
+                # Re-identify the robot from its actual controller position.
+                # This is required after a program reload because all at_* flags reset to 0.
+                # Match tolerance: TCP position <= 20 mm and every joint <= 5 degrees.
+                home_actual_joint = get_atl_joint_pose()
+                home_actual_tcp = get_atl_tcp_pose()
+                # AI16 contains the CNC number. Odd CNCs use DoorC1; even CNCs use DoorC2.
+                # Analog ranges tolerate +/-0.5 around the integer command.
+                ai16_home_cnc = get_analog_input(4,15)
+                ai16_home_door = 0
+                if(ai16_home_cnc >= 0.5):
+                    if(ai16_home_cnc < 1.5):
+                        ai16_home_door = 1
+                    end
+                end
+                if(ai16_home_cnc >= 1.5):
+                    if(ai16_home_cnc < 2.5):
+                        ai16_home_door = 2
+                    end
+                end
+                if(ai16_home_cnc >= 2.5):
+                    if(ai16_home_cnc < 3.5):
+                        ai16_home_door = 1
+                    end
+                end
+                if(ai16_home_cnc >= 3.5):
+                    if(ai16_home_cnc < 4.5):
+                        ai16_home_door = 2
+                    end
+                end
+                if(ai16_home_cnc >= 4.5):
+                    if(ai16_home_cnc < 5.5):
+                        ai16_home_door = 1
+                    end
+                end
+                if(ai16_home_cnc >= 5.5):
+                    if(ai16_home_cnc < 6.5):
+                        ai16_home_door = 2
+                    end
+                end
+                # [CNC36] Select the CNC point set for Home recognition from AI16.
+                # AI16 1/2 -> CNC1/2 set, 3/4 -> CNC3/4 set, 5/6 -> CNC5/6 set.
+                # If AI16 is outside 0.5..6.5, keep the set of the last executed Case.
+                if(ai16_home_cnc >= 0.5):
+                    if(ai16_home_cnc < 2.5):
+                        cnc_pair = 1
+                    end
+                end
+                if(ai16_home_cnc >= 2.5):
+                    if(ai16_home_cnc < 4.5):
+                        cnc_pair = 2
+                    end
+                end
+                if(ai16_home_cnc >= 4.5):
+                    if(ai16_home_cnc < 6.5):
+                        cnc_pair = 3
+                    end
+                end
+                # [CNC36] Load the active CNC point set (p_odd_* / p_even_*) from cnc_pair.
+                if(cnc_pair == 1):
+                    p_odd_door = p_door_c1
+                    p_even_door = p_door_c2
+                    p_odd_user_x_offset = p_c1_user_x_offset
+                    p_odd_air_v1 = p_air_c1v1
+                    p_odd_air_switch_tool = p_air_switch_tool
+                    p_odd_load_wait = p_c1_load_wait
+                    p_odd_load = p_c1_load
+                    p_odd_load_end = p_c1_load_end
+                    p_odd_unload_wait = p_c1_unload_wait
+                    p_odd_unload = p_c1_unload
+                    p_odd_unload_down = p_c1_unload_down
+                    p_even_user_x_offset = p_c2_user_x_offset
+                    p_even_air_v1 = p_air_c2v1
+                    p_even_air = p_air_c2
+                    p_even_load_wait = p_load_m2_wait
+                    p_even_load = p_load_c2
+                    p_even_load_end = p_end_load_m2v1
+                    p_even_unload_wait = p_unload_m2_wait
+                    p_even_unload = p_unload_m2
+                    log_message(1,"ACTIVE POINT SET CNC1 CNC2")
+                end
+                if(cnc_pair == 2):
+                    p_odd_door = p_door_c3
+                    p_even_door = p_door_c4
+                    p_odd_user_x_offset = p_c3_user_x_offset
+                    p_odd_air_v1 = p_c3_air_v1
+                    p_odd_air_switch_tool = p_c3_air_switch_tool
+                    p_odd_load_wait = p_c3_load_wait
+                    p_odd_load = p_c3_load
+                    p_odd_load_end = p_c3_load_end
+                    p_odd_unload_wait = p_c3_unload_wait
+                    p_odd_unload = p_c3_unload
+                    p_odd_unload_down = p_c3_unload_down
+                    p_even_user_x_offset = p_c4_user_x_offset
+                    p_even_air_v1 = p_c4_air_v1
+                    p_even_air = p_c4_air
+                    p_even_load_wait = p_c4_load_wait
+                    p_even_load = p_c4_load
+                    p_even_load_end = p_c4_load_end
+                    p_even_unload_wait = p_c4_unload_wait
+                    p_even_unload = p_c4_unload
+                    log_message(1,"ACTIVE POINT SET CNC3 CNC4")
+                end
+                if(cnc_pair == 3):
+                    p_odd_door = p_door_c5
+                    p_even_door = p_door_c6
+                    p_odd_user_x_offset = p_c5_user_x_offset
+                    p_odd_air_v1 = p_c5_air_v1
+                    p_odd_air_switch_tool = p_c5_air_switch_tool
+                    p_odd_load_wait = p_c5_load_wait
+                    p_odd_load = p_c5_load
+                    p_odd_load_end = p_c5_load_end
+                    p_odd_unload_wait = p_c5_unload_wait
+                    p_odd_unload = p_c5_unload
+                    p_odd_unload_down = p_c5_unload_down
+                    p_even_user_x_offset = p_c6_user_x_offset
+                    p_even_air_v1 = p_c6_air_v1
+                    p_even_air = p_c6_air
+                    p_even_load_wait = p_c6_load_wait
+                    p_even_load = p_c6_load
+                    p_even_load_end = p_c6_load_end
+                    p_even_unload_wait = p_c6_unload_wait
+                    p_even_unload = p_c6_unload
+                    log_message(1,"ACTIVE POINT SET CNC5 CNC6")
+                end
+                home_match_code = 0
+                home_best_joint_error = 999999.0
+                home_c1_danger_side = 0
+                home_c2_danger_side = 0
+
+                # get_atl_tcp_pose() returns Base coordinates, while both danger
+                # boundaries were taught in usrfr_thanh.  Convert Base XYZ to
+                # usrfr_thanh inside each comparison.  Direct expressions are used
+                # because this controller rejects arithmetic variable assignments.
+                # usrfr_thanh = [345.833,-489.782,-136.233,-0.093,-0.065,45.114].
+                # CNC1 straight X boundary: both P1/P2 use DoorC1 X = 679.362.
+                # CNC1 danger Y range: 496.706 <= Y <= 755.117.
+                if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) >= 496.706):
+                    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 755.117):
+                if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 496.706):
+                    if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) > 679.362):
+                        home_c1_danger_side = 1
+                    end
+                end
+                if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 496.706):
+                    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 550.000):
+                        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) > 679.362):
+                            home_c1_danger_side = 1
+                        end
+                    end
+                end
+                if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 550.000):
+                    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 600.000):
+                        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) > 679.362):
+                            home_c1_danger_side = 1
+                        end
+                    end
+                end
+                if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 600.000):
+                    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 650.000):
+                        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) > 679.362):
+                            home_c1_danger_side = 1
+                        end
+                    end
+                end
+                if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 650.000):
+                    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 700.000):
+                        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) > 679.362):
+                            home_c1_danger_side = 1
+                        end
+                    end
+                end
+                if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 700.000):
+                    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 755.117):
+                        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) > 679.362):
+                            home_c1_danger_side = 1
+                        end
+                    end
+                end
+                if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 755.117):
+                    if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) > 679.362):
+                        home_c1_danger_side = 1
+                    end
+                end
+                    end
+                end
+
+                # CNC2 straight X boundary: both P1/P2 use DoorC2 X = -365.358.
+                # The CNC2 working side has X smaller than the boundary line.
+                # CNC2 danger Y range: 321.336 <= Y <= 568.492.
+                if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) >= 321.336):
+                    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 568.492):
+                if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 321.336):
+                    if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) < -365.358):
+                        home_c2_danger_side = 1
+                    end
+                end
+                if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 321.336):
+                    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 375.000):
+                        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) < -365.358):
+                            home_c2_danger_side = 1
+                        end
+                    end
+                end
+                if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 375.000):
+                    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 425.000):
+                        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) < -365.358):
+                            home_c2_danger_side = 1
+                        end
+                    end
+                end
+                if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 425.000):
+                    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 475.000):
+                        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) < -365.358):
+                            home_c2_danger_side = 1
+                        end
+                    end
+                end
+                if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 475.000):
+                    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 525.000):
+                        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) < -365.358):
+                            home_c2_danger_side = 1
+                        end
+                    end
+                end
+                if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 525.000):
+                    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 568.492):
+                        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) < -365.358):
+                            home_c2_danger_side = 1
+                        end
+                    end
+                end
+                if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 568.492):
+                    if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) < -365.358):
+                        home_c2_danger_side = 1
+                    end
+                end
+                    end
+                end
+
+                home_test_tcp = kine_forward(p_odd_load_end)
+                home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+                if(home_test_error < home_best_joint_error):
+                    home_best_joint_error = home_test_error
+                    home_match_code = 1
+                end
+                home_test_tcp = kine_forward(p_odd_load)
+                home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+                if(home_test_error < home_best_joint_error):
+                    home_best_joint_error = home_test_error
+                    home_match_code = 2
+                end
+                home_test_tcp = kine_forward(p_odd_load_wait)
+                home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+                if(home_test_error < home_best_joint_error):
+                    home_best_joint_error = home_test_error
+                    home_match_code = 3
+                end
+                home_test_tcp = kine_forward(p_odd_unload)
+                home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+                if(home_test_error < home_best_joint_error):
+                    home_best_joint_error = home_test_error
+                    home_match_code = 4
+                end
+                home_test_tcp = kine_forward(p_odd_unload_wait)
+                home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+                if(home_test_error < home_best_joint_error):
+                    home_best_joint_error = home_test_error
+                    home_match_code = 5
+                end
+                home_test_tcp = kine_forward(p_odd_unload_down)
+                home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+                if(home_test_error < home_best_joint_error):
+                    home_best_joint_error = home_test_error
+                    home_match_code = 16
+                end
+                home_test_tcp = kine_forward(p_end_load_m2v2)
+                home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+                if(home_test_error < home_best_joint_error):
+                    home_best_joint_error = home_test_error
+                    home_match_code = 6
+                end
+                home_test_tcp = kine_forward(p_even_load_end)
+                home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+                if(home_test_error < home_best_joint_error):
+                    home_best_joint_error = home_test_error
+                    home_match_code = 7
+                end
+                home_test_tcp = kine_forward(p_even_load_wait)
+                home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+                if(home_test_error < home_best_joint_error):
+                    home_best_joint_error = home_test_error
+                    home_match_code = 8
+                end
+                home_test_tcp = kine_forward(p_even_unload)
+                home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+                if(home_test_error < home_best_joint_error):
+                    home_best_joint_error = home_test_error
+                    home_match_code = 9
+                end
+                home_test_tcp = kine_forward(p_even_unload_wait)
+                home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+                if(home_test_error < home_best_joint_error):
+                    home_best_joint_error = home_test_error
+                    home_match_code = 10
+                end
+                home_test_tcp = kine_forward(p_even_air)
+                home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+                if(home_test_error < home_best_joint_error):
+                    home_best_joint_error = home_test_error
+                    home_match_code = 11
+                end
+                home_test_tcp = kine_forward(p_even_load)
+                home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+                if(home_test_error < home_best_joint_error):
+                    home_best_joint_error = home_test_error
+                    home_match_code = 15
+                end
+                home_test_tcp = kine_forward(p_odd_door)
+                home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+                if(home_test_error < home_best_joint_error):
+                    home_best_joint_error = home_test_error
+                    home_match_code = 12
+                end
+                home_test_tcp = kine_forward(p_even_door)
+                home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+                if(home_test_error < home_best_joint_error):
+                    home_best_joint_error = home_test_error
+                    home_match_code = 13
+                end
+                home_test_tcp = kine_forward(p_home_location)
+                home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+                if(home_test_error < home_best_joint_error):
+                    home_best_joint_error = home_test_error
+                    home_match_code = 14
+                end
+
+                home_match_joint = p_home_location
+                if(home_match_code == 1):
+                    home_match_joint = p_odd_load_end
+                end
+                if(home_match_code == 2):
+                    home_match_joint = p_odd_load
+                end
+                if(home_match_code == 3):
+                    home_match_joint = p_odd_load_wait
+                end
+                if(home_match_code == 4):
+                    home_match_joint = p_odd_unload
+                end
+                if(home_match_code == 5):
+                    home_match_joint = p_odd_unload_wait
+                end
+                if(home_match_code == 16):
+                    home_match_joint = p_odd_unload_down
+                end
+                if(home_match_code == 6):
+                    home_match_joint = p_end_load_m2v2
+                end
+                if(home_match_code == 7):
+                    home_match_joint = p_even_load_end
+                end
+                if(home_match_code == 8):
+                    home_match_joint = p_even_load_wait
+                end
+                if(home_match_code == 9):
+                    home_match_joint = p_even_unload
+                end
+                if(home_match_code == 10):
+                    home_match_joint = p_even_unload_wait
+                end
+                if(home_match_code == 11):
+                    home_match_joint = p_even_air
+                end
+                if(home_match_code == 12):
+                    home_match_joint = p_odd_door
+                end
+                if(home_match_code == 13):
+                    home_match_joint = p_even_door
+                end
+                if(home_match_code == 15):
+                    home_match_joint = p_even_load
+                end
+
+                home_match_tcp = kine_forward(home_match_joint)
+                # Validate Cartesian position axis by axis. pose_dist also includes
+                # orientation on this controller and caused valid taught points to
+                # be rejected as UNKNOWN even when XYZ was within 20 mm.
+                home_match_valid = 1
+                if(home_actual_tcp[0] < home_match_tcp[0] - 20.0):
+                    home_match_valid = 0
+                end
+                if(home_actual_tcp[0] > home_match_tcp[0] + 20.0):
+                    home_match_valid = 0
+                end
+                if(home_actual_tcp[1] < home_match_tcp[1] - 20.0):
+                    home_match_valid = 0
+                end
+                if(home_actual_tcp[1] > home_match_tcp[1] + 20.0):
+                    home_match_valid = 0
+                end
+                if(home_actual_tcp[2] < home_match_tcp[2] - 20.0):
+                    home_match_valid = 0
+                end
+                if(home_actual_tcp[2] > home_match_tcp[2] + 20.0):
+                    home_match_valid = 0
+                end
+                # [CNC36] Joint tolerance +/-5 deg is computed from the matched taught point itself,
+                # so re-taught points and CNC3..CNC6 points need no extra *_min/*_max literal arrays.
+                # Arithmetic inside if() is already used by the TCP check above on this controller.
+                if(home_actual_joint[0] < home_match_joint[0] - 5.0):
+                    home_match_valid = 0
+                end
+                if(home_actual_joint[0] > home_match_joint[0] + 5.0):
+                    home_match_valid = 0
+                end
+                if(home_actual_joint[1] < home_match_joint[1] - 5.0):
+                    home_match_valid = 0
+                end
+                if(home_actual_joint[1] > home_match_joint[1] + 5.0):
+                    home_match_valid = 0
+                end
+                if(home_actual_joint[2] < home_match_joint[2] - 5.0):
+                    home_match_valid = 0
+                end
+                if(home_actual_joint[2] > home_match_joint[2] + 5.0):
+                    home_match_valid = 0
+                end
+                if(home_actual_joint[3] < home_match_joint[3] - 5.0):
+                    home_match_valid = 0
+                end
+                if(home_actual_joint[3] > home_match_joint[3] + 5.0):
+                    home_match_valid = 0
+                end
+                if(home_actual_joint[4] < home_match_joint[4] - 5.0):
+                    home_match_valid = 0
+                end
+                if(home_actual_joint[4] > home_match_joint[4] + 5.0):
+                    home_match_valid = 0
+                end
+                if(home_actual_joint[5] < home_match_joint[5] - 5.0):
+                    home_match_valid = 0
+                end
+                if(home_actual_joint[5] > home_match_joint[5] + 5.0):
+                    home_match_valid = 0
+                end
+
+                # Override normal point matching when the robot is at or between
+                # Load_daotool and Load_daotool_Wait.
+                home_load_daotool_segment = 1
+                if(home_actual_joint[0] < p_load_daotool_segment_min[0]):
+                    home_load_daotool_segment = 0
+                end
+                if(home_actual_joint[0] > p_load_daotool_segment_max[0]):
+                    home_load_daotool_segment = 0
+                end
+                if(home_actual_joint[1] < p_load_daotool_segment_min[1]):
+                    home_load_daotool_segment = 0
+                end
+                if(home_actual_joint[1] > p_load_daotool_segment_max[1]):
+                    home_load_daotool_segment = 0
+                end
+                if(home_actual_joint[2] < p_load_daotool_segment_min[2]):
+                    home_load_daotool_segment = 0
+                end
+                if(home_actual_joint[2] > p_load_daotool_segment_max[2]):
+                    home_load_daotool_segment = 0
+                end
+                if(home_actual_joint[3] < p_load_daotool_segment_min[3]):
+                    home_load_daotool_segment = 0
+                end
+                if(home_actual_joint[3] > p_load_daotool_segment_max[3]):
+                    home_load_daotool_segment = 0
+                end
+                if(home_actual_joint[4] < p_load_daotool_segment_min[4]):
+                    home_load_daotool_segment = 0
+                end
+                if(home_actual_joint[4] > p_load_daotool_segment_max[4]):
+                    home_load_daotool_segment = 0
+                end
+                if(home_actual_joint[5] < p_load_daotool_segment_min[5]):
+                    home_load_daotool_segment = 0
+                end
+                if(home_actual_joint[5] > p_load_daotool_segment_max[5]):
+                    home_load_daotool_segment = 0
+                end
+
+                # Same recognition for unload_daotool and unload_daotool_Wait.
+                home_unload_daotool_segment = 1
+                if(home_actual_joint[0] < p_unload_daotool_segment_min[0]):
+                    home_unload_daotool_segment = 0
+                end
+                if(home_actual_joint[0] > p_unload_daotool_segment_max[0]):
+                    home_unload_daotool_segment = 0
+                end
+                if(home_actual_joint[1] < p_unload_daotool_segment_min[1]):
+                    home_unload_daotool_segment = 0
+                end
+                if(home_actual_joint[1] > p_unload_daotool_segment_max[1]):
+                    home_unload_daotool_segment = 0
+                end
+                if(home_actual_joint[2] < p_unload_daotool_segment_min[2]):
+                    home_unload_daotool_segment = 0
+                end
+                if(home_actual_joint[2] > p_unload_daotool_segment_max[2]):
+                    home_unload_daotool_segment = 0
+                end
+                if(home_actual_joint[3] < p_unload_daotool_segment_min[3]):
+                    home_unload_daotool_segment = 0
+                end
+                if(home_actual_joint[3] > p_unload_daotool_segment_max[3]):
+                    home_unload_daotool_segment = 0
+                end
+                if(home_actual_joint[4] < p_unload_daotool_segment_min[4]):
+                    home_unload_daotool_segment = 0
+                end
+                if(home_actual_joint[4] > p_unload_daotool_segment_max[4]):
+                    home_unload_daotool_segment = 0
+                end
+                if(home_actual_joint[5] < p_unload_daotool_segment_min[5]):
+                    home_unload_daotool_segment = 0
+                end
+                if(home_actual_joint[5] > p_unload_daotool_segment_max[5]):
+                    home_unload_daotool_segment = 0
+                end
+
+                if(home_load_daotool_segment == 1):
+                    home_match_code = 17
+                    home_match_valid = 1
+                end
+                if(home_unload_daotool_segment == 1):
+                    home_match_code = 18
+                    home_match_valid = 1
+                end
+
+                # [DROP] Recognize any stopped position between the drop point and the point 100 mm above it.
+                # A joint is outside when it is beyond BOTH endpoints by more than 5 degrees.
+                home_process7_unload_segment = 1
+                if(home_actual_joint[0] < p_drop[0] - 5.0):
+                    if(home_actual_joint[0] < p_drop_above_joint[0] - 5.0):
+                        home_process7_unload_segment = 0
+                    end
+                end
+                if(home_actual_joint[0] > p_drop[0] + 5.0):
+                    if(home_actual_joint[0] > p_drop_above_joint[0] + 5.0):
+                        home_process7_unload_segment = 0
+                    end
+                end
+                if(home_actual_joint[1] < p_drop[1] - 5.0):
+                    if(home_actual_joint[1] < p_drop_above_joint[1] - 5.0):
+                        home_process7_unload_segment = 0
+                    end
+                end
+                if(home_actual_joint[1] > p_drop[1] + 5.0):
+                    if(home_actual_joint[1] > p_drop_above_joint[1] + 5.0):
+                        home_process7_unload_segment = 0
+                    end
+                end
+                if(home_actual_joint[2] < p_drop[2] - 5.0):
+                    if(home_actual_joint[2] < p_drop_above_joint[2] - 5.0):
+                        home_process7_unload_segment = 0
+                    end
+                end
+                if(home_actual_joint[2] > p_drop[2] + 5.0):
+                    if(home_actual_joint[2] > p_drop_above_joint[2] + 5.0):
+                        home_process7_unload_segment = 0
+                    end
+                end
+                if(home_actual_joint[3] < p_drop[3] - 5.0):
+                    if(home_actual_joint[3] < p_drop_above_joint[3] - 5.0):
+                        home_process7_unload_segment = 0
+                    end
+                end
+                if(home_actual_joint[3] > p_drop[3] + 5.0):
+                    if(home_actual_joint[3] > p_drop_above_joint[3] + 5.0):
+                        home_process7_unload_segment = 0
+                    end
+                end
+                if(home_actual_joint[4] < p_drop[4] - 5.0):
+                    if(home_actual_joint[4] < p_drop_above_joint[4] - 5.0):
+                        home_process7_unload_segment = 0
+                    end
+                end
+                if(home_actual_joint[4] > p_drop[4] + 5.0):
+                    if(home_actual_joint[4] > p_drop_above_joint[4] + 5.0):
+                        home_process7_unload_segment = 0
+                    end
+                end
+                if(home_actual_joint[5] < p_drop[5] - 5.0):
+                    if(home_actual_joint[5] < p_drop_above_joint[5] - 5.0):
+                        home_process7_unload_segment = 0
+                    end
+                end
+                if(home_actual_joint[5] > p_drop[5] + 5.0):
+                    if(home_actual_joint[5] > p_drop_above_joint[5] + 5.0):
+                        home_process7_unload_segment = 0
+                    end
+                end
+                if(home_process7_unload_segment == 1):
+                    home_match_code = 19
+                    home_match_valid = 1
+                end
+
+                at_c1_load_wait = 0
+                at_c1_load = 0
+                at_c1_load_end = 0
+                at_c1_unload_wait = 0
+                at_c1_unload = 0
+                at_load_m2_wait = 0
+                at_load_m2 = 0
+                at_end_load_m2 = 0
+                at_unload_m2_wait = 0
+                at_unload_m2 = 0
+                at_air_c2 = 0
+                if(home_match_valid == 1):
+                    if(home_match_code == 1):
+                        at_c1_load_end = 1
+                        log_message(1,"HOME ACTUAL POSITION MATCH C1LOADEND")
+                    end
+                    if(home_match_code == 2):
+                        at_c1_load = 1
+                        log_message(1,"HOME ACTUAL POSITION MATCH C1LOAD")
+                    end
+                    if(home_match_code == 3):
+                        at_c1_load_wait = 1
+                        log_message(1,"HOME ACTUAL POSITION MATCH C1LOADWAIT")
+                    end
+                    if(home_match_code == 4):
+                        at_c1_unload = 1
+                        log_message(1,"HOME ACTUAL POSITION MATCH C1UNLOAD")
+                    end
+                    if(home_match_code == 5):
+                        at_c1_unload_wait = 1
+                        log_message(1,"HOME ACTUAL POSITION MATCH C1UNLOADWAIT")
+                    end
+                    if(home_match_code == 16):
+                        log_message(1,"HOME ACTUAL POSITION MATCH C1UNLOADDOWN")
+                    end
+                    if(home_match_code == 6):
+                        at_end_load_m2 = 1
+                        log_message(1,"HOME ACTUAL POSITION MATCH ENDLOADM2V2")
+                    end
+                    if(home_match_code == 7):
+                        at_load_m2 = 1
+                        log_message(1,"HOME ACTUAL POSITION MATCH ENDLOADM2V1")
+                    end
+                    if(home_match_code == 8):
+                        at_load_m2_wait = 1
+                        log_message(1,"HOME ACTUAL POSITION MATCH LOADM2_WAIT")
+                    end
+                    if(home_match_code == 9):
+                        at_unload_m2 = 1
+                        log_message(1,"HOME ACTUAL POSITION MATCH UNLOADM2")
+                    end
+                    if(home_match_code == 10):
+                        at_unload_m2_wait = 1
+                        log_message(1,"HOME ACTUAL POSITION MATCH UNLOADM2_WAIT")
+                    end
+                    if(home_match_code == 11):
+                        at_air_c2 = 1
+                        log_message(1,"HOME ACTUAL POSITION MATCH AIRC2")
+                    end
+                    if(home_match_code == 12):
+                        home_route_door_done = 1
+                        log_message(1,"HOME ACTUAL POSITION MATCH DOORC1")
+                    end
+                    if(home_match_code == 13):
+                        home_route_door_done = 1
+                        log_message(1,"HOME ACTUAL POSITION MATCH DOORC2")
+                    end
+                    if(home_match_code == 14):
+                        home_route_door_done = 1
+                        home_already_home = 1
+                        log_message(1,"HOME ACTUAL POSITION MATCH HOMELOCATION")
+                    end
+                    if(home_match_code == 15):
+                        log_message(1,"HOME ACTUAL POSITION MATCH LOADC2")
+                    end
+                    if(home_match_code == 17):
+                        log_message(1,"HOME ACTUAL POSITION IN LOAD_DAOTOOL SEGMENT")
+                    end
+                    if(home_match_code == 18):
+                        log_message(1,"HOME ACTUAL POSITION IN UNLOAD_DAOTOOL SEGMENT")
+                    end
+                    if(home_match_code == 19):
+                        log_message(1,"HOME ACTUAL POSITION IN DROP SEGMENT")
+                    end
+                else:
+                    home_match_code = 0
+                    log_message(2,"HOME ACTUAL POSITION NOT IN SPECIAL TOLERANCE")
+                end
+                # Point recognition has priority. Check the danger region only
+                # when the current pose does not match any taught special point.
+                if(home_match_valid == 0):
+                    if(home_c1_danger_side == 1):
+                        log_message(2,"HOME CNC1 DANGER SIDE DETECTED AFTER POINT CHECK")
+                        # [CNC36] Danger side: retreat by MoveL to the Wait point of the tool facing the chuck,
+                        # then to the Door. Tool identified by J6 (Load ~ +44, Air ~ -45, Unload ~ -135);
+                        # thresholds are midpoints of the active taught J6 values. Speed 30 mm/s.
+                        home_c1_wait_route = 0
+                        if(home_actual_joint[5] >= (p_odd_load_wait[5] + p_odd_air_v1[5]) * 0.5):
+                            home_c1_wait_route = 1
+                        end
+                        if(home_actual_joint[5] <= (p_odd_unload_wait[5] + p_odd_air_v1[5]) * 0.5):
+                            home_c1_wait_route = 2
+                        end
+                        if(home_c1_wait_route == 1):
+                            log_message(1,"HOME CNC1 DANGER LOAD TOOL MOVEL C1LOADWAIT START")
+                            home_wait_pose = kine_forward(p_odd_load_wait)
+                            home_wait_pose = pose_add(home_wait_pose,p_odd_user_x_offset)
+                            movl(home_wait_pose,0,30,200,0)
+                            at_c1_load_wait = 1
+                            home_route_hint = 1
+                            log_message(1,"HOME ROUTE C1LOADWAIT COMPLETE")
+                        end
+                        if(home_c1_wait_route == 2):
+                            log_message(1,"HOME CNC1 DANGER UNLOAD TOOL MOVEL C1UNLOADWAIT START")
+                            home_wait_pose = kine_forward(p_odd_unload_wait)
+                            movl(home_wait_pose,0,30,200,0)
+                            at_c1_unload_wait = 1
+                            home_route_hint = 1
+                            log_message(1,"HOME ROUTE C1UNLOADWAIT COMPLETE")
+                        end
+                        # Air-blow orientation: back to the air entry point (the air Wait), then straight to the Door.
+                        if(home_c1_wait_route == 0):
+                            log_message(1,"HOME CNC1 DANGER AIR TOOL MOVEL AIRC1V1 START")
+                            home_wait_pose = kine_forward(p_odd_air_v1)
+                            movl(home_wait_pose,0,30,200,0)
+                            log_message(1,"HOME ROUTE AIRC1V1 COMPLETE")
+                            door_c1_keep_j6_joint = get_atl_joint_pose()
+                            door_c1_keep_j6_joint[0] = p_odd_door[0]
+                            door_c1_keep_j6_joint[1] = p_odd_door[1]
+                            door_c1_keep_j6_joint[2] = p_odd_door[2]
+                            door_c1_keep_j6_joint[3] = p_odd_door[3]
+                            door_c1_keep_j6_joint[4] = p_odd_door[4]
+                            door_c1_keep_j6_pose = kine_forward(door_c1_keep_j6_joint)
+                            log_message(1,"HOME ROUTE MOVEL DOORC1 KEEP CURRENT J6")
+                                movl(door_c1_keep_j6_pose,0,30,200,0)
+                            log_message(1,"AT DOORC1 KEEP CURRENT J6 NO ROTATION")
+                            home_route_door_done = 1
+                            home_route_hint = 1
+                            at_c1_load_wait = 0
+                            at_c1_load = 0
+                            at_c1_load_end = 0
+                            at_c1_unload_wait = 0
+                            at_c1_unload = 0
+                            at_load_m2_wait = 0
+                            at_load_m2 = 0
+                            at_end_load_m2 = 0
+                            at_unload_m2_wait = 0
+                            at_unload_m2 = 0
+                            at_air_c2 = 0
+                            log_message(1,"HOME ROUTE DOORC1 COMPLETE")
+                        end
+                    end
+                end
+                if(home_match_valid == 0):
+                    # Do not execute the CNC2 escape after the CNC1 escape has
+                    # already reached DoorC1, even if the two coarse danger
+                    # regions overlap at an unusual robot pose.
+                    if(home_route_door_done == 0):
+                        if(home_c2_danger_side == 1):
+                        log_message(2,"HOME CNC2 DANGER SIDE DETECTED AFTER POINT CHECK")
+                        # [CNC36] Danger side: retreat by MoveL to the Wait point of the tool facing the chuck,
+                        # then to the Door. Tool identified by J6 (Load ~ +44, Air ~ -45, Unload ~ -135);
+                        # thresholds are midpoints of the active taught J6 values. Speed 30 mm/s.
+                        home_c2_wait_route = 0
+                        if(home_actual_joint[5] >= (p_even_load_wait[5] + p_even_air_v1[5]) * 0.5):
+                            home_c2_wait_route = 1
+                        end
+                        if(home_actual_joint[5] <= (p_even_unload_wait[5] + p_even_air_v1[5]) * 0.5):
+                            home_c2_wait_route = 2
+                        end
+                        if(home_c2_wait_route == 1):
+                            log_message(1,"HOME CNC2 DANGER LOAD TOOL MOVEL LOADM2_WAIT START")
+                            home_wait_pose = kine_forward(p_even_load_wait)
+                            home_wait_pose = pose_add(home_wait_pose,p_even_user_x_offset)
+                            movl(home_wait_pose,0,30,200,0)
+                            at_load_m2_wait = 1
+                            home_route_hint = 2
+                            log_message(1,"HOME ROUTE LOADM2_WAIT COMPLETE")
+                        end
+                        if(home_c2_wait_route == 2):
+                            log_message(1,"HOME CNC2 DANGER UNLOAD TOOL MOVEL UNLOADM2_WAIT START")
+                            home_wait_pose = kine_forward(p_even_unload_wait)
+                            movl(home_wait_pose,0,30,200,0)
+                            at_unload_m2_wait = 1
+                            home_route_hint = 2
+                            log_message(1,"HOME ROUTE UNLOADM2_WAIT COMPLETE")
+                        end
+                        # Air-blow orientation: back to the air entry point (the air Wait), then straight to the Door.
+                        if(home_c2_wait_route == 0):
+                            log_message(1,"HOME CNC2 DANGER AIR TOOL MOVEL AIRC2V1 START")
+                            home_wait_pose = kine_forward(p_even_air_v1)
+                            movl(home_wait_pose,0,30,200,0)
+                            log_message(1,"HOME ROUTE AIRC2V1 COMPLETE")
+                            door_c2_keep_j6_joint = get_atl_joint_pose()
+                            door_c2_keep_j6_joint[0] = p_even_door[0]
+                            door_c2_keep_j6_joint[1] = p_even_door[1]
+                            door_c2_keep_j6_joint[2] = p_even_door[2]
+                            door_c2_keep_j6_joint[3] = p_even_door[3]
+                            door_c2_keep_j6_joint[4] = p_even_door[4]
+                            door_c2_keep_j6_pose = kine_forward(door_c2_keep_j6_joint)
+                            log_message(1,"HOME ROUTE MOVEL DOORC2 KEEP CURRENT J6")
+                                movl(door_c2_keep_j6_pose,0,30,200,0)
+                            log_message(1,"AT DOORC2 KEEP CURRENT J6 NO ROTATION")
+                            home_route_door_done = 1
+                            home_route_hint = 2
+                            at_c1_load_wait = 0
+                            at_c1_load = 0
+                            at_c1_load_end = 0
+                            at_c1_unload_wait = 0
+                            at_c1_unload = 0
+                            at_load_m2_wait = 0
+                            at_load_m2 = 0
+                            at_end_load_m2 = 0
+                            at_unload_m2_wait = 0
+                            at_unload_m2 = 0
+                            at_air_c2 = 0
+                                log_message(1,"HOME ROUTE DOORC2 COMPLETE")
+                        end
+                        end
+                    end
+                end
+                if(at_c1_load_end == 1):
+                    log_message(1,"HOME ROUTE CURRENT AT C1LOADEND")
+                    log_message(1,"HOME ROUTE MOVEL C1LOAD START")
+                    p_c1_load_pose = kine_forward(p_odd_load)
+                    p_c1_load_pose = pose_add(p_c1_load_pose,p_odd_user_x_offset)
+                    movl(p_c1_load_pose,0,30,200,0)
+                    at_c1_load_end = 0
+                    at_c1_load = 1
+                    home_route_hint = 1
+                    log_message(1,"HOME ROUTE C1LOAD COMPLETE")
+                end
+                if(at_c1_load == 1):
+                    log_message(1,"HOME ROUTE CURRENT AT C1LOAD")
+                    log_message(1,"HOME ROUTE MOVEL C1LOADWAIT START")
+                    p_c1_load_wait_pose = kine_forward(p_odd_load_wait)
+                    p_c1_load_wait_pose = pose_add(p_c1_load_wait_pose,p_odd_user_x_offset)
+                    movl(p_c1_load_wait_pose,0,speed_movel_fast,3500,0)
+                    at_c1_load = 0
+                    at_c1_load_wait = 1
+                    home_route_hint = 1
+                    log_message(1,"HOME ROUTE C1LOADWAIT COMPLETE")
+                end
+                if(at_c1_load_wait == 1):
+                    log_message(1,"HOME ROUTE CURRENT AT C1LOADWAIT")
+                    log_message(1,"HOME ROUTE MOVEJ DOORC1 START")
+                    door_c1_keep_j6_joint = get_atl_joint_pose()
+                    door_c1_keep_j6_joint[0] = p_odd_door[0]
+                    door_c1_keep_j6_joint[1] = p_odd_door[1]
+                    door_c1_keep_j6_joint[2] = p_odd_door[2]
+                    door_c1_keep_j6_joint[3] = p_odd_door[3]
+                    door_c1_keep_j6_joint[4] = p_odd_door[4]
+                    movj(door_c1_keep_j6_joint,0,speed_movej_fast,720,0)
+                    home_route_door_done = 1
+                    log_message(1,"HOME ROUTE DOORC1 COMPLETE")
+                end
+                if(at_c1_unload == 1):
+                    log_message(1,"HOME ROUTE CURRENT AT C1UNLOAD")
+                    log_message(1,"HOME ROUTE MOVEL C1UNLOADWAIT START")
+                    p_c1_unload_wait_pose = kine_forward(p_odd_unload_wait)
+                    movl(p_c1_unload_wait_pose,0,speed_movel_fast,3500,0)
+                    at_c1_unload = 0
+                    at_c1_unload_wait = 1
+                    home_route_hint = 1
+                    log_message(1,"HOME ROUTE C1UNLOADWAIT COMPLETE")
+                end
+                if(home_match_code == 16):
+                    log_message(1,"HOME ROUTE CURRENT AT C1UNLOADDOWN")
+                    log_message(1,"HOME ROUTE MOVEL C1UNLOADDOWN TO C1UNLOADWAIT START")
+                    p_c1_unload_wait_pose = kine_forward(p_odd_unload_wait)
+                    movl(p_c1_unload_wait_pose,0,speed_movel_fast,3500,0)
+                    at_c1_unload_wait = 1
+                    home_route_hint = 1
+                    log_message(1,"HOME ROUTE C1UNLOADWAIT COMPLETE")
+                end
+                if(at_c1_unload_wait == 1):
+                    log_message(1,"HOME ROUTE CURRENT AT C1UNLOADWAIT")
+                    log_message(1,"HOME ROUTE MOVEJ DOORC1 START")
+                    door_c1_keep_j6_joint = get_atl_joint_pose()
+                    door_c1_keep_j6_joint[0] = p_odd_door[0]
+                    door_c1_keep_j6_joint[1] = p_odd_door[1]
+                    door_c1_keep_j6_joint[2] = p_odd_door[2]
+                    door_c1_keep_j6_joint[3] = p_odd_door[3]
+                    door_c1_keep_j6_joint[4] = p_odd_door[4]
+                    movj(door_c1_keep_j6_joint,0,speed_movej_fast,720,0)
+                    home_route_door_done = 1
+                    log_message(1,"HOME ROUTE DOORC1 COMPLETE")
+                end
+                if(at_end_load_m2 == 1):
+                    log_message(1,"HOME ROUTE CURRENT AT ENDLOADM2V2")
+                    log_message(1,"HOME ROUTE MOVEL ENDLOADM2V1 START")
+                    p_end_load_m2v1_pose = kine_forward(p_even_load_end)
+                    p_end_load_m2v1_pose = pose_add(p_end_load_m2v1_pose,p_even_user_x_offset)
+                                movl(p_end_load_m2v1_pose,0,30,200,0)
+                    at_end_load_m2 = 0
+                    at_load_m2 = 1
+                    home_route_hint = 2
+                    log_message(1,"HOME ROUTE ENDLOADM2V1 COMPLETE")
+                end
+                if(at_load_m2 == 1):
+                    log_message(1,"HOME ROUTE CURRENT AT ENDLOADM2V1")
+                    log_message(1,"HOME ROUTE MOVEL LOADM2_WAIT START")
+                    p_load_m2_wait_pose = kine_forward(p_even_load_wait)
+                    p_load_m2_wait_pose = pose_add(p_load_m2_wait_pose,p_even_user_x_offset)
+                    movl(p_load_m2_wait_pose,0,speed_movel_fast,3500,0)
+                    at_load_m2 = 0
+                    at_load_m2_wait = 1
+                    home_route_hint = 2
+                    log_message(1,"HOME ROUTE LOADM2_WAIT COMPLETE")
+                end
+                if(home_match_code == 15):
+                    log_message(1,"HOME ROUTE CURRENT AT LOADC2")
+                    log_message(1,"HOME ROUTE MOVEL LOADC2 TO LOADM2_WAIT START")
+                    p_load_m2_wait_pose = kine_forward(p_even_load_wait)
+                    p_load_m2_wait_pose = pose_add(p_load_m2_wait_pose,p_even_user_x_offset)
+                    movl(p_load_m2_wait_pose,0,speed_movel_fast,3500,0)
+                    at_load_m2_wait = 1
+                    home_route_hint = 2
+                    log_message(1,"HOME ROUTE LOADM2_WAIT COMPLETE")
+                end
+                if(at_load_m2_wait == 1):
+                    log_message(1,"HOME ROUTE CURRENT AT LOADM2_WAIT")
+                    log_message(1,"HOME ROUTE MOVEJ DOORC2 START")
+                    door_c2_keep_j6_joint = get_atl_joint_pose()
+                    door_c2_keep_j6_joint[0] = p_even_door[0]
+                    door_c2_keep_j6_joint[1] = p_even_door[1]
+                    door_c2_keep_j6_joint[2] = p_even_door[2]
+                    door_c2_keep_j6_joint[3] = p_even_door[3]
+                    door_c2_keep_j6_joint[4] = p_even_door[4]
+                    movj(door_c2_keep_j6_joint,0,speed_movej_fast,720,0)
+                    home_route_door_done = 1
+                    log_message(1,"HOME ROUTE DOORC2 COMPLETE")
+                end
+                if(at_unload_m2 == 1):
+                    log_message(1,"HOME ROUTE CURRENT AT UNLOADM2")
+                    log_message(1,"HOME ROUTE MOVEL UNLOADM2_WAIT START")
+                    p_unload_m2_wait_pose = kine_forward(p_even_unload_wait)
+                    movl(p_unload_m2_wait_pose,0,speed_movel_fast,3500,0)
+                    at_unload_m2 = 0
+                    at_unload_m2_wait = 1
+                    home_route_hint = 2
+                    log_message(1,"HOME ROUTE UNLOADM2_WAIT COMPLETE")
+                end
+                if(at_unload_m2_wait == 1):
+                    log_message(1,"HOME ROUTE CURRENT AT UNLOADM2_WAIT")
+                    log_message(1,"HOME ROUTE MOVEJ DOORC2 START")
+                    door_c2_keep_j6_joint = get_atl_joint_pose()
+                    door_c2_keep_j6_joint[0] = p_even_door[0]
+                    door_c2_keep_j6_joint[1] = p_even_door[1]
+                    door_c2_keep_j6_joint[2] = p_even_door[2]
+                    door_c2_keep_j6_joint[3] = p_even_door[3]
+                    door_c2_keep_j6_joint[4] = p_even_door[4]
+                    movj(door_c2_keep_j6_joint,0,speed_movej_fast,720,0)
+                    home_route_door_done = 1
+                    log_message(1,"HOME ROUTE DOORC2 COMPLETE")
+                end
+                if(at_air_c2 == 1):
+                    log_message(1,"HOME ROUTE CURRENT AT AIRC2")
+                    # [CNC36] Retreat AirC2 -> AirC2v1 (reverse of the entry path) before DoorC2.
+                    log_message(1,"HOME ROUTE MOVEL AIRC2V1 START")
+                    home_wait_pose = kine_forward(p_even_air_v1)
+                    movl(home_wait_pose,0,30,200,0)
+                    log_message(1,"HOME ROUTE AIRC2V1 COMPLETE")
+                    log_message(1,"HOME ROUTE MOVEJ DOORC2 START")
+                    door_c2_keep_j6_joint = get_atl_joint_pose()
+                    door_c2_keep_j6_joint[0] = p_even_door[0]
+                    door_c2_keep_j6_joint[1] = p_even_door[1]
+                    door_c2_keep_j6_joint[2] = p_even_door[2]
+                    door_c2_keep_j6_joint[3] = p_even_door[3]
+                    door_c2_keep_j6_joint[4] = p_even_door[4]
+                    movj(door_c2_keep_j6_joint,0,speed_movej_fast,720,0)
+                    home_route_door_done = 1
+                    at_air_c2 = 0
+                    log_message(1,"HOME ROUTE DOORC2 COMPLETE")
+                end
+                if(home_match_code == 17):
+                    log_message(1,"HOME ROUTE LOAD_DAOTOOL SEGMENT TO LOAD_DAOTOOL_WAIT")
+                    movj(p_load_daotool_wait,0,speed_movej_fast,720,0)
+                    home_route_door_done = 1
+                    log_message(1,"HOME ROUTE LOAD_DAOTOOL_WAIT COMPLETE")
+                end
+                if(home_match_code == 18):
+                    log_message(1,"HOME ROUTE UNLOAD_DAOTOOL SEGMENT TO UNLOAD_DAOTOOL_WAIT")
+                    movj(p_unload_daotool_wait,0,speed_movej_fast,720,0)
+                    home_route_door_done = 1
+                    log_message(1,"HOME ROUTE UNLOAD_DAOTOOL_WAIT COMPLETE")
+                end
+                if(home_match_code == 19):
+                    log_message(1,"HOME ROUTE DROP SEGMENT MOVEL STRAIGHT UP TO DROP ABOVE")
+                    movl(p_drop_above_pose,0,30,200,0)
+                    home_route_door_done = 1
+                    log_message(1,"HOME ROUTE DROP ABOVE COMPLETE")
+                end
+                # AI16 is lower priority than all recognized points and danger regions.
+                # It is used only when no route above has already reached a safe point/door.
+                if(home_route_door_done == 0):
+                    if(ai16_home_door == 1):
+                        log_message(1,"HOME AI16 CNC1 CNC3 CNC5 VIA DOORC1")
+                        door_c1_keep_j6_joint = get_atl_joint_pose()
+                        door_c1_keep_j6_joint[0] = p_odd_door[0]
+                        door_c1_keep_j6_joint[1] = p_odd_door[1]
+                        door_c1_keep_j6_joint[2] = p_odd_door[2]
+                        door_c1_keep_j6_joint[3] = p_odd_door[3]
+                        door_c1_keep_j6_joint[4] = p_odd_door[4]
+                        movj(door_c1_keep_j6_joint,0,speed_movej_fast,720,0)
+                        home_route_door_done = 1
+                    end
+                    if(ai16_home_door == 2):
+                        log_message(1,"HOME AI16 CNC2 CNC4 CNC6 VIA DOORC2")
+                        door_c2_keep_j6_joint = get_atl_joint_pose()
+                        door_c2_keep_j6_joint[0] = p_even_door[0]
+                        door_c2_keep_j6_joint[1] = p_even_door[1]
+                        door_c2_keep_j6_joint[2] = p_even_door[2]
+                        door_c2_keep_j6_joint[3] = p_even_door[3]
+                        door_c2_keep_j6_joint[4] = p_even_door[4]
+                        movj(door_c2_keep_j6_joint,0,speed_movej_fast,720,0)
+                        home_route_door_done = 1
+                    end
+                end
+                # Fixed route based on the last known robot position group.
+                # C1 points always use DoorC1; C2 points always use DoorC2.
+                if(home_route_door_done == 0):
+                    if(home_route_hint == 1):
+                        log_message(1,"HOME POSITION ROUTE CNC1 VIA DOORC1")
+                        door_c1_keep_j6_joint = get_atl_joint_pose()
+                        door_c1_keep_j6_joint[0] = p_odd_door[0]
+                        door_c1_keep_j6_joint[1] = p_odd_door[1]
+                        door_c1_keep_j6_joint[2] = p_odd_door[2]
+                        door_c1_keep_j6_joint[3] = p_odd_door[3]
+                        door_c1_keep_j6_joint[4] = p_odd_door[4]
+                        movj(door_c1_keep_j6_joint,0,speed_movej_fast,720,0)
+                        home_route_door_done = 1
+                    end
+                    if(home_route_hint == 2):
+                        log_message(1,"HOME POSITION ROUTE CNC2 VIA DOORC2")
+                        door_c2_keep_j6_joint = get_atl_joint_pose()
+                        door_c2_keep_j6_joint[0] = p_even_door[0]
+                        door_c2_keep_j6_joint[1] = p_even_door[1]
+                        door_c2_keep_j6_joint[2] = p_even_door[2]
+                        door_c2_keep_j6_joint[3] = p_even_door[3]
+                        door_c2_keep_j6_joint[4] = p_even_door[4]
+                        movj(door_c2_keep_j6_joint,0,speed_movej_fast,720,0)
+                        home_route_door_done = 1
+                    end
+                end
+                # Fallback requested by the operator: after checking every
+                # special point and both danger regions, an unknown position
+                # moves directly to HomeLocation by MoveJ.
+                if(home_route_door_done == 0):
+                    log_message(2,"HOME NO SPECIAL POINT OR DANGER REGION")
+                    log_message(1,"HOME UNKNOWN POSITION MOVEJ HOME DIRECT START")
+                    movj(p_home_location,0,speed_movej_fast,720,0)
+                    home_route_door_done = 1
+                    home_already_home = 1
+                    log_message(1,"HOME UNKNOWN POSITION HOMELOCATION COMPLETE")
+                end
+                if(home_route_door_done == 1):
+                    if(home_already_home == 0):
+                        log_message(1,"HOME PROCESS MOVEJ HOMELOCATION START")
+                        movj(p_home_location,0,speed_movej_fast,720,0)
+                        log_message(1,"HOME PROCESS HOMELOCATION COMPLETE")
+                    else:
+                        log_message(1,"HOME PROCESS ALREADY AT HOMELOCATION")
+                    end
+                    at_c1_load_wait = 0
+                    at_c1_load = 0
+                    at_c1_load_end = 0
+                    at_c1_unload_wait = 0
+                    at_c1_unload = 0
+                    at_load_m2_wait = 0
+                    at_load_m2 = 0
+                    at_end_load_m2 = 0
+                    at_unload_m2_wait = 0
+                    at_unload_m2 = 0
+                    at_air_c2 = 0
+                    home_route_hint = 0
+                    set_digital_output(4,15,1,1)
+                    log_message(1,"DO16 ON ROBOT AT HOME WAIT DI90 OFF")
+                end
+            end
+        else:
+            if(home_latched == 1):
+                home_latched = 0
+                active_process = 0
+                process_idx = 0
+                log_message(1,"DI90 OFF HOME PROCESS COMPLETE")
+                log_message(1,"WAIT DI90 HOME OR DI18-DI27 PROCESS ON")
+            end
+        end
+
+        # Select one Process only, priority P1 to P10
+        if(active_process == 0):
+            di18 = get_digital_input(4,17)
+            di19 = get_digital_input(4,18)
+            di20 = get_digital_input(4,19)
+            di21 = get_digital_input(4,20)
+            di22 = get_digital_input(4,21)
+            di23 = get_digital_input(4,22)
+            di24 = get_digital_input(4,23)
+            di25 = get_digital_input(4,24)
+            di26 = get_digital_input(4,25)
+            di27 = get_digital_input(4,26)
+
+            # Accept Process requests that were already ON before program start.
+            # If several inputs are ON, selection priority is P1 through P10.
+            # Remaining requests are accepted after the current Process exits.
+            if(startup_scan == 1):
+                log_message(1,"STARTUP SCAN DI18-DI27")
+                if(di18 == 1):
+                    log_message(1,"STARTUP DI18 ALREADY ON REQUEST P1")
+                end
+                if(di19 == 1):
+                    log_message(1,"STARTUP DI19 ALREADY ON REQUEST P2")
+                end
+                if(di20 == 1):
+                    log_message(1,"STARTUP DI20 ALREADY ON REQUEST P3")
+                end
+                if(di21 == 1):
+                    log_message(1,"STARTUP DI21 ALREADY ON REQUEST P4")
+                end
+                if(di22 == 1):
+                    log_message(1,"STARTUP DI22 ALREADY ON REQUEST P5")
+                end
+                if(di23 == 1):
+                    log_message(1,"STARTUP DI23 ALREADY ON REQUEST P6")
+                end
+                if(di24 == 1):
+                    log_message(1,"STARTUP DI24 ALREADY ON REQUEST P7")
+                end
+                if(di25 == 1):
+                    log_message(1,"STARTUP DI25 ALREADY ON REQUEST P8")
+                end
+                if(di26 == 1):
+                    log_message(1,"STARTUP DI26 ALREADY ON REQUEST P9")
+                end
+                if(di27 == 1):
+                    log_message(1,"STARTUP DI27 ALREADY ON REQUEST P10")
+                end
+                startup_scan = 0
+            end
+
+            if(di18 == 1):
+                active_process = 1
+                process_idx = 17
+                log_message(1,"DI18 ON ENTER P1 GET SUPPLY")
+            else:
+                if(di19 == 1):
+                    active_process = 2
+                    process_idx = 18
+                    log_message(1,"DI19 ON ENTER P2 CNC1 CNC2")
+                else:
+                    if(di20 == 1):
+                        active_process = 3
+                        process_idx = 19
+                        log_message(1,"DI20 ON ENTER P3 CNC3 CNC4")
+                    else:
+                        if(di21 == 1):
+                            active_process = 4
+                            process_idx = 20
+                            log_message(1,"DI21 ON ENTER P4 CNC5 CNC6")
+                        else:
+                            if(di22 == 1):
+                                active_process = 5
+                                process_idx = 21
+                                log_message(1,"DI22 ON ENTER P5 CLEAN UNIT")
+                            else:
+                                if(di23 == 1):
+                                    active_process = 6
+                                    process_idx = 22
+                                    log_message(1,"DI23 ON ENTER P6 BAVIA")
+                                else:
+                                    if(di24 == 1):
+                                        active_process = 7
+                                        process_idx = 23
+                                        log_message(1,"DI24 ON ENTER P7 INSPECTION")
+                                    else:
+                                        if(di25 == 1):
+                                            active_process = 8
+                                            process_idx = 24
+                                            log_message(1,"DI25 ON ENTER P8 CHANGE TOOL")
+                                        else:
+                                            if(di26 == 1):
+                                                active_process = 9
+                                                process_idx = 25
+                                                log_message(1,"DI26 ON ENTER P9")
+                                            else:
+                                                if(di27 == 1):
+                                                    active_process = 10
+                                                    process_idx = 26
+                                                    log_message(1,"DI27 ON ENTER P10")
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+
+            if(active_process > 0):
+                set_digital_output(4,15,0,1)
+                log_message(1,"DO16 OFF ROBOT LEAVING HOME")
+                if(active_process == 1):
+                    set_analog_output(4,1,1,1)
+                    set_digital_output(4,17,1,1)
+                    log_message(1,"CURRENT P1 AO2 1 DO18 ON WAIT DI28 ON OR DI16 ON")
+                end
+                if(active_process == 2):
+                    set_analog_output(4,1,2,1)
+                    set_digital_output(4,18,1,1)
+                    log_message(1,"CURRENT P2 AO2 2 DO19 ON")
+                end
+                if(active_process == 3):
+                    set_analog_output(4,1,3,1)
+                    set_digital_output(4,19,1,1)
+                    log_message(1,"CURRENT P3 AO2 3 DO20 ON")
+                end
+                if(active_process == 4):
+                    set_analog_output(4,1,4,1)
+                    set_digital_output(4,20,1,1)
+                    log_message(1,"CURRENT P4 AO2 4 DO21 ON")
+                end
+                if(active_process == 5):
+                    set_analog_output(4,1,5,1)
+                    set_digital_output(4,21,1,1)
+                    log_message(1,"CURRENT P5 AO2 5 DO22 ON WAIT DI45 ON OR DI46 ON")
+                end
+                if(active_process == 6):
+                    set_analog_output(4,1,6,1)
+                    set_digital_output(4,22,1,1)
+                    log_message(1,"CURRENT P6 AO2 6 DO23 ON")
+                    log_message(1,"P6 MOVEJ PROCESS6SAFE TEMP START")
+                    movj(p_process6_safe,0,speed_movej_fast,720,0)
+                    log_message(1,"P6 PROCESS6SAFE TEMP COMPLETE")
+                    log_message(1,"WAIT DI48 ON OR DI49 ON OR DI50 ON OR DI51 ON")
+                end
+                if(active_process == 7):
+                    set_analog_output(4,1,7,1)
+                    set_digital_output(4,23,1,1)
+                    log_message(1,"CURRENT P7 AO2 7 DO24 ON WAIT DI53 ON OR DI16 ON")
+                end
+                if(active_process == 8):
+                    set_analog_output(4,1,8,1)
+                    set_digital_output(4,24,1,1)
+                    log_message(1,"CURRENT P8 AO2 8 DO25 ON WAIT DI55 ON OR DI16 ON")
+                end
+                if(active_process == 9):
+                    set_analog_output(4,1,9,1)
+                    set_digital_output(4,25,1,1)
+                    log_message(1,"CURRENT P9 AO2 9 DO26 ON NO CASE MAPPED")
+                end
+                if(active_process == 10):
+                    set_analog_output(4,1,10,1)
+                    set_digital_output(4,26,1,1)
+                    log_message(1,"CURRENT P10 AO2 10 DO27 ON NO CASE MAPPED")
+                end
+                door_select = -1
+                if(active_process == 2):
+                    door_select = 0
+                end
+                if(active_process == 3):
+                    door_select = 0
+                end
+                if(active_process == 4):
+                    door_select = 0
+                end
+                # [CNC36] Select the CNC pair and its point set (incl. Door) before the entry Door move.
+                if(active_process == 2):
+                    cnc_pair = 1
+                end
+                if(active_process == 3):
+                    cnc_pair = 2
+                end
+                if(active_process == 4):
+                    cnc_pair = 3
+                end
+                if(door_select == 0):
+                    # [CNC36] Load the active CNC point set (p_odd_* / p_even_*) from cnc_pair.
+                    if(cnc_pair == 1):
+                        p_odd_door = p_door_c1
+                        p_even_door = p_door_c2
+                        p_odd_user_x_offset = p_c1_user_x_offset
+                        p_odd_air_v1 = p_air_c1v1
+                        p_odd_air_switch_tool = p_air_switch_tool
+                        p_odd_load_wait = p_c1_load_wait
+                        p_odd_load = p_c1_load
+                        p_odd_load_end = p_c1_load_end
+                        p_odd_unload_wait = p_c1_unload_wait
+                        p_odd_unload = p_c1_unload
+                        p_odd_unload_down = p_c1_unload_down
+                        p_even_user_x_offset = p_c2_user_x_offset
+                        p_even_air_v1 = p_air_c2v1
+                        p_even_air = p_air_c2
+                        p_even_load_wait = p_load_m2_wait
+                        p_even_load = p_load_c2
+                        p_even_load_end = p_end_load_m2v1
+                        p_even_unload_wait = p_unload_m2_wait
+                        p_even_unload = p_unload_m2
+                        log_message(1,"ACTIVE POINT SET CNC1 CNC2")
+                    end
+                    if(cnc_pair == 2):
+                        p_odd_door = p_door_c3
+                        p_even_door = p_door_c4
+                        p_odd_user_x_offset = p_c3_user_x_offset
+                        p_odd_air_v1 = p_c3_air_v1
+                        p_odd_air_switch_tool = p_c3_air_switch_tool
+                        p_odd_load_wait = p_c3_load_wait
+                        p_odd_load = p_c3_load
+                        p_odd_load_end = p_c3_load_end
+                        p_odd_unload_wait = p_c3_unload_wait
+                        p_odd_unload = p_c3_unload
+                        p_odd_unload_down = p_c3_unload_down
+                        p_even_user_x_offset = p_c4_user_x_offset
+                        p_even_air_v1 = p_c4_air_v1
+                        p_even_air = p_c4_air
+                        p_even_load_wait = p_c4_load_wait
+                        p_even_load = p_c4_load
+                        p_even_load_end = p_c4_load_end
+                        p_even_unload_wait = p_c4_unload_wait
+                        p_even_unload = p_c4_unload
+                        log_message(1,"ACTIVE POINT SET CNC3 CNC4")
+                    end
+                    if(cnc_pair == 3):
+                        p_odd_door = p_door_c5
+                        p_even_door = p_door_c6
+                        p_odd_user_x_offset = p_c5_user_x_offset
+                        p_odd_air_v1 = p_c5_air_v1
+                        p_odd_air_switch_tool = p_c5_air_switch_tool
+                        p_odd_load_wait = p_c5_load_wait
+                        p_odd_load = p_c5_load
+                        p_odd_load_end = p_c5_load_end
+                        p_odd_unload_wait = p_c5_unload_wait
+                        p_odd_unload = p_c5_unload
+                        p_odd_unload_down = p_c5_unload_down
+                        p_even_user_x_offset = p_c6_user_x_offset
+                        p_even_air_v1 = p_c6_air_v1
+                        p_even_air = p_c6_air
+                        p_even_load_wait = p_c6_load_wait
+                        p_even_load = p_c6_load
+                        p_even_load_end = p_c6_load_end
+                        p_even_unload_wait = p_c6_unload_wait
+                        p_even_unload = p_c6_unload
+                        log_message(1,"ACTIVE POINT SET CNC5 CNC6")
+                    end
+                end
+                if(door_select == 0):
+                    log_message(1,"WAIT DI83 DOORC1 OR DI84 DOORC2 ON")
+                    while(door_select == 0):
+                        di83 = get_digital_input(4,82)
+                        di84 = get_digital_input(4,83)
+                        if(di83 == 1):
+                            door_select = 1
+                            last_door_select = 1
+                        else:
+                            if(di84 == 1):
+                                door_select = 2
+                                last_door_select = 2
+                            end
+                        end
+                        sleep(0.1)
+                    end
+                    if(door_select == 1):
+                        log_message(1,"DI83 ON ENTRY MOVEJ DOORC1")
+                        movj(p_odd_door,0,speed_movej_fast,720,0)
+                    else:
+                        log_message(1,"DI84 ON ENTRY MOVEJ DOORC2")
+                        movj(p_even_door,0,speed_movej_fast,720,0)
+                    end
+                    if(active_process == 2):
+                        log_message(1,"WAIT DI30 ON OR DI31 ON OR DI32 ON OR DI33 ON")
+                    end
+                    if(active_process == 3):
+                        log_message(1,"WAIT DI35 ON OR DI36 ON OR DI37 ON OR DI38 ON")
+                    end
+                    if(active_process == 4):
+                        log_message(1,"WAIT DI40 ON OR DI41 ON OR DI42 ON OR DI43 ON")
+                    end
+                end
+            end
+        end
+
+        if(active_process > 0):
+            # JAKA Modbus: use a fixed literal index for every Process read.
+            # Do not pass process_idx into get_digital_input; some controller
+            # versions return an incorrect value when the index is a variable.
+            process_di = 0
+            if(active_process == 1):
+                process_di = get_digital_input(4,17)
+            end
+            if(active_process == 2):
+                process_di = get_digital_input(4,18)
+            end
+            if(active_process == 3):
+                process_di = get_digital_input(4,19)
+            end
+            if(active_process == 4):
+                process_di = get_digital_input(4,20)
+            end
+            if(active_process == 5):
+                process_di = get_digital_input(4,21)
+            end
+            if(active_process == 6):
+                process_di = get_digital_input(4,22)
+            end
+            if(active_process == 7):
+                process_di = get_digital_input(4,23)
+            end
+            if(active_process == 8):
+                process_di = get_digital_input(4,24)
+            end
+            if(active_process == 9):
+                process_di = get_digital_input(4,25)
+            end
+            if(active_process == 10):
+                process_di = get_digital_input(4,26)
+            end
+
+            # Process request DI18-DI27 is latched after it is accepted.
+            # DI18-DI27 may turn OFF without leaving the active Process.
+            # DI16 may exit Process only after DI17 has exited the active Case.
+            if(active_case > 0):
+                di16 = 0
+            end
+            if(di16 == 1):
+                if(active_process == 1):
+                    log_message(1,"EXIT P1 DI18 OFF DO18 OFF")
+                end
+                if(active_process == 2):
+                    log_message(1,"EXIT P2 DI19 OFF DO19 OFF")
+                end
+                if(active_process == 3):
+                    log_message(1,"EXIT P3 DI20 OFF DO20 OFF")
+                end
+                if(active_process == 4):
+                    log_message(1,"EXIT P4 DI21 OFF DO21 OFF")
+                end
+                if(active_process == 5):
+                    log_message(1,"EXIT P5 DI22 OFF DO22 OFF")
+                end
+                if(active_process == 6):
+                    log_message(1,"EXIT P6 DI23 OFF DO23 OFF")
+                end
+                if(active_process == 7):
+                    log_message(1,"EXIT P7 DI24 OFF DO24 OFF")
+                end
+                if(active_process == 8):
+                    log_message(1,"EXIT P8 DI25 OFF DO25 OFF")
+                end
+                if(active_process == 9):
+                    log_message(1,"EXIT P9 DI26 OFF DO26 OFF")
+                end
+                if(active_process == 10):
+                    log_message(1,"EXIT P10 DI27 OFF DO27 OFF")
+                end
+                if(active_case > 0):
+                    set_digital_output(4,active_case,0,1)
+                end
+                set_digital_output(4,17,0,1)
+                set_digital_output(4,18,0,1)
+                set_digital_output(4,19,0,1)
+                set_digital_output(4,20,0,1)
+                set_digital_output(4,21,0,1)
+                set_digital_output(4,22,0,1)
+                set_digital_output(4,23,0,1)
+                set_digital_output(4,24,0,1)
+                set_digital_output(4,25,0,1)
+                set_digital_output(4,26,0,1)
+                active_case = 0
+                active_process = 0
+                process_idx = 0
+                set_analog_output(4,1,0,1)
+                log_message(1,"WAIT DI18-DI27 ON OR DI16 ON")
+            else:
+                # DI17 returns from the current Case to Process scan
+                di17 = get_digital_input(4,16)
+                if(di17 == 1):
+                    if(active_case > 0):
+                        set_digital_output(4,active_case,0,1)
+                        active_case = 0
+                        case_completed = 0
+                    end
+                    log_message(1,"DI17 ON RETURN TO PROCESS SCAN")
+                    log_message(1,"WAIT DI17 OFF")
+                    wait_input(4,16,0,0)
+                    if(active_process == 1):
+                        log_message(1,"CURRENT P1 WAIT DI28 ON")
+                    end
+                    if(active_process == 2):
+                        log_message(1,"CURRENT P2 WAIT DI30 ON OR DI31 ON OR DI32 ON OR DI33 ON")
+                    end
+                    if(active_process == 3):
+                        log_message(1,"CURRENT P3 WAIT DI35 ON OR DI36 ON OR DI37 ON OR DI38 ON")
+                    end
+                    if(active_process == 4):
+                        log_message(1,"CURRENT P4 WAIT DI40 ON OR DI41 ON OR DI42 ON OR DI43 ON")
+                    end
+                    if(active_process == 5):
+                        log_message(1,"CURRENT P5 WAIT DI45 ON OR DI46 ON")
+                    end
+                    if(active_process == 6):
+                        log_message(1,"CURRENT P6 WAIT DI48 ON OR DI49 ON OR DI50 ON OR DI51 ON")
+                    end
+                    if(active_process == 7):
+                        log_message(1,"CURRENT P7 WAIT DI53 ON")
+                    end
+                    if(active_process == 8):
+                        log_message(1,"CURRENT P8 WAIT DI55 ON")
+                    end
+                else:
+                    # Select Case for the active Process
+                    if(active_case == 0):
+                        di28 = get_digital_input(4,27)
+                        di30 = get_digital_input(4,29)
+                        di31 = get_digital_input(4,30)
+                        di32 = get_digital_input(4,31)
+                        di33 = get_digital_input(4,32)
+                        di35 = get_digital_input(4,34)
+                        di36 = get_digital_input(4,35)
+                        di37 = get_digital_input(4,36)
+                        di38 = get_digital_input(4,37)
+                        di40 = get_digital_input(4,39)
+                        di41 = get_digital_input(4,40)
+                        di42 = get_digital_input(4,41)
+                        di43 = get_digital_input(4,42)
+                        di45 = get_digital_input(4,44)
+                        di46 = get_digital_input(4,45)
+                        di48 = get_digital_input(4,47)
+                        di49 = get_digital_input(4,48)
+                        di50 = get_digital_input(4,49)
+                        di51 = get_digital_input(4,50)
+                        di53 = get_digital_input(4,52)
+                        di55 = get_digital_input(4,54)
+
+                        if(active_process == 1):
+                            if(di28 == 1):
+                                active_case = 27
+                                log_message(1,"DI28 ON P1 CASE1 GET NEW PD")
+                            end
+                        end
+
+                        if(active_process == 2):
+                            if(di30 == 1):
+                                active_case = 29
+                                log_message(1,"DI30 ON P2 CASE1 LOAD CNC1")
+                            else:
+                                if(di31 == 1):
+                                    active_case = 30
+                                    log_message(1,"DI31 ON P2 CASE2 UNLOAD CNC1")
+                                else:
+                                    if(di32 == 1):
+                                        active_case = 31
+                                        log_message(1,"DI32 ON P2 CASE3 LOAD CNC2")
+                                    else:
+                                        if(di33 == 1):
+                                            active_case = 32
+                                            log_message(1,"DI33 ON P2 CASE4 UNLOAD CNC2")
+                                        end
+                                    end
+                                end
+                            end
+                        end
+
+                        if(active_process == 3):
+                            if(di35 == 1):
+                                active_case = 34
+                                log_message(1,"DI35 ON P3 CASE1 LOAD CNC3")
+                            else:
+                                if(di36 == 1):
+                                    active_case = 35
+                                    log_message(1,"DI36 ON P3 CASE2 UNLOAD CNC3")
+                                else:
+                                    if(di37 == 1):
+                                        active_case = 36
+                                        log_message(1,"DI37 ON P3 CASE3 LOAD CNC4")
+                                    else:
+                                        if(di38 == 1):
+                                            active_case = 37
+                                            log_message(1,"DI38 ON P3 CASE4 UNLOAD CNC4")
+                                        end
+                                    end
+                                end
+                            end
+                        end
+
+                        if(active_process == 4):
+                            if(di40 == 1):
+                                active_case = 39
+                                log_message(1,"DI40 ON P4 CASE1 LOAD CNC5")
+                            else:
+                                if(di41 == 1):
+                                    active_case = 40
+                                    log_message(1,"DI41 ON P4 CASE2 UNLOAD CNC5")
+                                else:
+                                    if(di42 == 1):
+                                        active_case = 41
+                                        log_message(1,"DI42 ON P4 CASE3 LOAD CNC6")
+                                    else:
+                                        if(di43 == 1):
+                                            active_case = 42
+                                            log_message(1,"DI43 ON P4 CASE4 UNLOAD CNC6")
+                                        end
+                                    end
+                                end
+                            end
+                        end
+
+                        if(active_process == 5):
+                            if(di45 == 1):
+                                active_case = 44
+                                log_message(1,"DI45 ON P5 CASE1 PUT CLEAN UNIT")
+                            else:
+                                if(di46 == 1):
+                                    active_case = 45
+                                    log_message(1,"DI46 ON P5 CASE2 GET CLEAN UNIT")
+                                end
+                            end
+                        end
+
+                        if(active_process == 6):
+                            if(di48 == 1):
+                                active_case = 47
+                                log_message(1,"DI48 ON P6 CASE1 PUT BAVIA")
+                            else:
+                                if(di49 == 1):
+                                    active_case = 48
+                                    log_message(1,"DI49 ON P6 CASE2 GET BAVIA")
+                                else:
+                                    if(di50 == 1):
+                                        active_case = 49
+                                        log_message(1,"DI50 ON P6 CASE3 PUT ROTARY")
+                                    else:
+                                        if(di51 == 1):
+                                            active_case = 50
+                                            log_message(1,"DI51 ON P6 CASE4 GET ROTARY")
+                                        end
+                                    end
+                                end
+                            end
+                        end
+
+                        if(active_process == 7):
+                            if(di53 == 1):
+                                active_case = 52
+                                log_message(1,"DI53 ON P7 CASE1 PUT INSPECTION")
+                            end
+                        end
+
+                        if(active_process == 8):
+                            if(di55 == 1):
+                                active_case = 54
+                                log_message(1,"DI55 ON P8 CASE1 CHANGE TOOL")
+                            end
+                        end
+
+                        # Case execution point
+                        if(active_case > 0):
+                            case_motion_ok = 1
+                            case_completed = 0
+                            cnc_motion_case = 0
+                            # [CNC36] P2/P3/P4 share one Case motion code (cnc_motion_case 29..32).
+                            # cnc_pair selects the taught point set used by that motion:
+                            # 1 = CNC1/CNC2 (Axis1 Pos CNC12), 2 = CNC3/CNC4 (Pos CNC34), 3 = CNC5/CNC6 (Pos CNC56).
+                            if(active_process == 2):
+                                cnc_motion_case = active_case
+                                cnc_pair = 1
+                            end
+                            if(active_process == 3):
+                                if(active_case == 34):
+                                    cnc_motion_case = 29
+                                end
+                                if(active_case == 35):
+                                    cnc_motion_case = 30
+                                end
+                                if(active_case == 36):
+                                    cnc_motion_case = 31
+                                end
+                                if(active_case == 37):
+                                    cnc_motion_case = 32
+                                end
+                                cnc_pair = 2
+                                log_message(1,"CURRENT P3 USE SHARED CNC MOTION CASE1-4")
+                            end
+                            if(active_process == 4):
+                                if(active_case == 39):
+                                    cnc_motion_case = 29
+                                end
+                                if(active_case == 40):
+                                    cnc_motion_case = 30
+                                end
+                                if(active_case == 41):
+                                    cnc_motion_case = 31
+                                end
+                                if(active_case == 42):
+                                    cnc_motion_case = 32
+                                end
+                                cnc_pair = 3
+                                log_message(1,"CURRENT P4 USE SHARED CNC MOTION CASE1-4")
+                            end
+                            if(cnc_motion_case > 0):
+                                # [CNC36] Load the active CNC point set (p_odd_* / p_even_*) from cnc_pair.
+                                if(cnc_pair == 1):
+                                    p_odd_door = p_door_c1
+                                    p_even_door = p_door_c2
+                                    p_odd_user_x_offset = p_c1_user_x_offset
+                                    p_odd_air_v1 = p_air_c1v1
+                                    p_odd_air_switch_tool = p_air_switch_tool
+                                    p_odd_load_wait = p_c1_load_wait
+                                    p_odd_load = p_c1_load
+                                    p_odd_load_end = p_c1_load_end
+                                    p_odd_unload_wait = p_c1_unload_wait
+                                    p_odd_unload = p_c1_unload
+                                    p_odd_unload_down = p_c1_unload_down
+                                    p_even_user_x_offset = p_c2_user_x_offset
+                                    p_even_air_v1 = p_air_c2v1
+                                    p_even_air = p_air_c2
+                                    p_even_load_wait = p_load_m2_wait
+                                    p_even_load = p_load_c2
+                                    p_even_load_end = p_end_load_m2v1
+                                    p_even_unload_wait = p_unload_m2_wait
+                                    p_even_unload = p_unload_m2
+                                    log_message(1,"ACTIVE POINT SET CNC1 CNC2")
+                                end
+                                if(cnc_pair == 2):
+                                    p_odd_door = p_door_c3
+                                    p_even_door = p_door_c4
+                                    p_odd_user_x_offset = p_c3_user_x_offset
+                                    p_odd_air_v1 = p_c3_air_v1
+                                    p_odd_air_switch_tool = p_c3_air_switch_tool
+                                    p_odd_load_wait = p_c3_load_wait
+                                    p_odd_load = p_c3_load
+                                    p_odd_load_end = p_c3_load_end
+                                    p_odd_unload_wait = p_c3_unload_wait
+                                    p_odd_unload = p_c3_unload
+                                    p_odd_unload_down = p_c3_unload_down
+                                    p_even_user_x_offset = p_c4_user_x_offset
+                                    p_even_air_v1 = p_c4_air_v1
+                                    p_even_air = p_c4_air
+                                    p_even_load_wait = p_c4_load_wait
+                                    p_even_load = p_c4_load
+                                    p_even_load_end = p_c4_load_end
+                                    p_even_unload_wait = p_c4_unload_wait
+                                    p_even_unload = p_c4_unload
+                                    log_message(1,"ACTIVE POINT SET CNC3 CNC4")
+                                end
+                                if(cnc_pair == 3):
+                                    p_odd_door = p_door_c5
+                                    p_even_door = p_door_c6
+                                    p_odd_user_x_offset = p_c5_user_x_offset
+                                    p_odd_air_v1 = p_c5_air_v1
+                                    p_odd_air_switch_tool = p_c5_air_switch_tool
+                                    p_odd_load_wait = p_c5_load_wait
+                                    p_odd_load = p_c5_load
+                                    p_odd_load_end = p_c5_load_end
+                                    p_odd_unload_wait = p_c5_unload_wait
+                                    p_odd_unload = p_c5_unload
+                                    p_odd_unload_down = p_c5_unload_down
+                                    p_even_user_x_offset = p_c6_user_x_offset
+                                    p_even_air_v1 = p_c6_air_v1
+                                    p_even_air = p_c6_air
+                                    p_even_load_wait = p_c6_load_wait
+                                    p_even_load = p_c6_load
+                                    p_even_load_end = p_c6_load_end
+                                    p_even_unload_wait = p_c6_unload_wait
+                                    p_even_unload = p_c6_unload
+                                    log_message(1,"ACTIVE POINT SET CNC5 CNC6")
+                                end
+                                # [CNC36] Warning only: AI16 (CNC number from PLC) should belong to the active pair.
+                                # Confirm AI16 meaning with the PLC side before turning this into a blocking interlock.
+                                cnc_pos_ai16 = get_analog_input(4,15)
+                                cnc_pos_pair = 0
+                                if(cnc_pos_ai16 >= 0.5):
+                                    if(cnc_pos_ai16 < 2.5):
+                                        cnc_pos_pair = 1
+                                    end
+                                end
+                                if(cnc_pos_ai16 >= 2.5):
+                                    if(cnc_pos_ai16 < 4.5):
+                                        cnc_pos_pair = 2
+                                    end
+                                end
+                                if(cnc_pos_ai16 >= 4.5):
+                                    if(cnc_pos_ai16 < 6.5):
+                                        cnc_pos_pair = 3
+                                    end
+                                end
+                                cnc_pos_mismatch = 1
+                                if(cnc_pos_pair == cnc_pair):
+                                    cnc_pos_mismatch = 0
+                                end
+                                if(cnc_pos_mismatch == 1):
+                                    log_message(2,"WARNING AI16 CNC NUMBER NOT IN ACTIVE PAIR CHECK AXIS1 POSITION")
+                                end
+                            end
+                            if(active_process == 1):
+                                log_message(1,"CURRENT P1 CASE1 RUN")
+                                log_message(1,"P1C1 MOVEJ PICKWWAIT START")
+                                # Pass-through wait point; exact stop is required at PICK below.
+                                movj(p_pick_true_axis,0,speed_movej_fast,720,10)
+                                log_message(1,"P1C1 PICKWWAIT COMPLETE")
+                                log_message(1,"P1C1 MOVEL PICK START")
+                                p_pick_pose = kine_forward(p_pick)
+                                movl(p_pick_pose,0,speed_movel,200,0)
+                                log_message(1,"P1C1 PICK COMPLETE")
+
+                                set_digital_output(4,59,1,1)
+                                log_message(1,"P1C1 DO60 ON WAIT DI60 ON")
+                                di60 = get_digital_input(4,59)
+                                while(di60 == 0):
+                                    sleep(0.1)
+                                    di60 = get_digital_input(4,59)
+                                end
+
+                                set_digital_output(4,59,0,1)
+                                if(case_motion_ok == 1):
+                                    log_message(1,"DI60 ON DO60 OFF CLAMP COMPLETE")
+                                    log_message(1,"P1C1 MOVEL RETURN PICKWWAIT START")
+                                    p_pick_true_axis_pose = kine_forward(p_pick_true_axis)
+                                movl(p_pick_true_axis_pose,0,speed_movel_fast,3500,0)
+                                    log_message(1,"P1C1 RETURN PICKWWAIT COMPLETE")
+                                else:
+                                    log_message(2,"P1C1 ABORTED DO60 OFF")
+                                end
+                            end
+                            if(cnc_motion_case > 0):
+                                at_c1_load_wait = 0
+                                at_c1_load = 0
+                                at_c1_load_end = 0
+                                at_c1_unload_wait = 0
+                                at_c1_unload = 0
+                                at_load_m2_wait = 0
+                                at_load_m2 = 0
+                                at_end_load_m2 = 0
+                                at_unload_m2_wait = 0
+                                at_unload_m2 = 0
+                                at_air_c2 = 0
+                                if(cnc_motion_case == 29):                                        
+                                        # Step 1: Move to AirC1v1, then run DO74/DI74.
+                                        log_message(1,"P2C1 ENTRY MOVEL AIRC1V1 START")
+                                        p_air_c1v1_pose = kine_forward(p_odd_air_v1)
+                                        movl(p_air_c1v1_pose,0,speed_movel_fast,3500,0)
+                                        log_message(1,"P2C1 AIRC1V1 COMPLETE")
+
+                                        set_digital_output(4,73,1,1)
+                                        log_message(1,"P2C1 DO74 ON WAIT DI74 ON AT AIRC1V1")
+                                        wait_input(4,73,1,0)
+                                        # DI74 ON: turn DO74 OFF (index 73).
+                                        set_digital_output(4,73,0,1)
+                                        log_message(1,"P2C1 DI74 ON DO74 OFF COMPLETE")
+
+                                        # Step 2: Slow transition between the two CNC1 air points.
+                                        log_message(1,"P2C1 MOVEL AIRSWITCHTOOL START")
+                                        p_air_switch_tool_pose = kine_forward(p_odd_air_switch_tool)
+                                        movl(p_air_switch_tool_pose,0,30,200,0)
+                                        log_message(1,"P2C1 AIRSWITCHTOOL COMPLETE")
+
+                                        set_digital_output(4,74,1,1)
+                                        log_message(1,"P2C1 DO75 ON WAIT DI75 ON AT AIRSWITCHTOOL")
+                                        wait_input(4,74,1,0)
+                                        # DI75 ON: turn DO75 OFF (index 74).
+                                        set_digital_output(4,74,0,1)
+                                        log_message(1,"P2C1 DI75 ON DO75 OFF COMPLETE")
+
+                                        log_message(1,"P2C1 MOVEJ C1LOADWAIT START")
+                                        # Blend only at the approach wait point.
+                                        p_c1_load_wait_pose = kine_forward(p_odd_load_wait)
+                                        p_c1_load_wait_pose = pose_add(p_c1_load_wait_pose,p_odd_user_x_offset)
+                                        p_c1_load_wait_offset_joint = kine_inverse(p_odd_load_wait,p_c1_load_wait_pose)
+                                        movj(p_c1_load_wait_offset_joint,0,speed_movej_fast,720,10)
+                                        at_c1_load_wait = 1
+                                        home_route_hint = 1
+                                        log_message(1,"P2C1 C1LOADWAIT COMPLETE")
+
+                                        if(case_motion_ok == 1):
+                                        log_message(1,"P2C1 MOVEL C1LOAD START")
+                                        at_c1_load_wait = 0
+                                        p_c1_load_pose = kine_forward(p_odd_load)
+                                        p_c1_load_pose = pose_add(p_c1_load_pose,p_odd_user_x_offset)
+                                        movl(p_c1_load_pose,0,30,200,0)
+                                        at_c1_load = 1
+                                        home_route_hint = 1
+                                        log_message(1,"P2C1 C1LOAD COMPLETE")
+
+                                        set_digital_output(4,60,1,1)
+                                        log_message(1,"P2C1 AT C1LOAD DO61 ON WAIT DI61 ON")
+                                        wait_input(4,60,1,0)
+                                        set_digital_output(4,60,0,1)
+                                        log_message(1,"P2C1 DI61 ON DO61 OFF")
+
+                                        log_message(1,"P2C1 MOVEL C1LOADEND START")
+                                        at_c1_load = 0
+                                        p_c1_load_end_pose = kine_forward(p_odd_load_end)
+                                        p_c1_load_end_pose = pose_add(p_c1_load_end_pose,p_odd_user_x_offset)
+                                        movl(p_c1_load_end_pose,0,30,200,0)
+                                        at_c1_load_end = 1
+                                        home_route_hint = 1
+                                        log_message(1,"P2C1 C1LOADEND COMPLETE")
+
+                                        if(case_motion_ok == 1):
+                                            # [CNC36] DO79/DI79 = Clamp Chuck of the odd CNC, shared by P2/P3/P4 (confirmed 2026-11):
+                                            # the PLC clamps CNC1, CNC3 or CNC5 according to the active Process.
+                                            set_digital_output(4,78,1,1)
+                                            log_message(1,"P2C1 AT C1LOADEND DO79 ON WAIT DI79 ON CLAMP")
+                                            wait_input(4,78,1,0)
+                                            set_digital_output(4,78,0,1)
+                                            log_message(1,"P2C1 DI79 ON DO79 OFF CLAMP COMPLETE")
+
+                                            log_message(1,"P2C1 MOVEL RETURN C1LOAD START")
+                                            at_c1_load_end = 0
+                                            p_c1_load_pose = kine_forward(p_odd_load)
+                                            p_c1_load_pose = pose_add(p_c1_load_pose,p_odd_user_x_offset)
+                                            movl(p_c1_load_pose,0,30,200,0)
+                                            at_c1_load = 1
+                                            home_route_hint = 1
+                                            log_message(1,"P2C1 MOVEL RETURN C1LOAD COMPLETE")
+
+                                            log_message(1,"P2C1 MOVEL RETURN C1LOADWAIT START")
+                                            at_c1_load = 0
+                                            p_c1_load_wait_pose = kine_forward(p_odd_load_wait)
+                                            p_c1_load_wait_pose = pose_add(p_c1_load_wait_pose,p_odd_user_x_offset)
+                                            movl(p_c1_load_wait_pose,0,speed_movel_fast,3500,0)
+                                            at_c1_load_wait = 1
+                                            home_route_hint = 1
+                                            log_message(1,"P2C1 MOVEL RETURN C1LOADWAIT COMPLETE")
+
+                                            log_message(1,"P2C1 END AT C1LOADWAIT")
+                                        else:
+                                            case_motion_ok = 0
+                                            log_message(2,"P2C1 UNCLAMP ABORTED DO61 OFF")
+                                        end
+                                        end
+                                    else:
+                                        if(cnc_motion_case == 30):
+                                            log_message(1,"CURRENT P2 CASE2 UNLOAD CNC1 RUN AIRC1V1 THEN AIRSWITCHTOOL")
+                                            
+                                            # Step 1: Move to AirC1v1, then run DO74/DI74.
+                                            log_message(1,"P2C2 ENTRY MOVEL AIRC1V1 START")
+                                            p_air_c1v1_pose = kine_forward(p_odd_air_v1)
+                                            movl(p_air_c1v1_pose,0,speed_movel_fast,3500,0)
+                                            log_message(1,"P2C2 AIRC1V1 COMPLETE")
+
+                                            set_digital_output(4,73,1,1)
+                                            log_message(1,"P2C2 DO74 ON WAIT DI74 ON AT AIRC1V1")
+                                            wait_input(4,73,1,0)
+                                            # DI74 ON: turn DO74 OFF (index 73).
+                                            set_digital_output(4,73,0,1)
+                                            log_message(1,"P2C2 DI74 ON DO74 OFF COMPLETE")
+
+                                            # Step 2: Slow transition between the two CNC1 air points.
+                                            log_message(1,"P2C2 MOVEL AIRSWITCHTOOL START")
+                                            p_air_switch_tool_pose = kine_forward(p_odd_air_switch_tool)
+                                            movl(p_air_switch_tool_pose,0,30,200,0)
+                                            log_message(1,"P2C2 AIRSWITCHTOOL COMPLETE")
+
+                                            set_digital_output(4,74,1,1)
+                                            log_message(1,"P2C2 DO75 ON WAIT DI75 ON AT AIRSWITCHTOOL")
+                                            wait_input(4,74,1,0)
+                                            # DI75 ON: turn DO75 OFF (index 74).
+                                            set_digital_output(4,74,0,1)
+                                            log_message(1,"P2C2 DI75 ON DO75 OFF COMPLETE")
+
+                                            log_message(1,"P2C2 MOVEJ C1UNLOADWAIT START")
+                                            # Blend only at the approach wait point.
+                                            movj(p_odd_unload_wait,0,speed_movej_fast,720,10)
+                                            at_c1_unload_wait = 1
+                                            home_route_hint = 1
+                                            log_message(1,"P2C2 C1UNLOADWAIT COMPLETE")
+
+                                            if(case_motion_ok == 1):
+                                            log_message(1,"P2C2 MOVEL C1UNLOAD START")
+                                            at_c1_unload_wait = 0
+                                            p_c1_unload_pose = kine_forward(p_odd_unload)
+                                            movl(p_c1_unload_pose,0,speed_movel,200,0)
+                                            at_c1_unload = 1
+                                            home_route_hint = 1
+                                            log_message(1,"P2C2 C1UNLOAD COMPLETE")
+
+                                            set_digital_output(4,63,1,1)
+                                            log_message(1,"P2C2 DO64 ON WAIT DI64 ON CLAMP UNLOAD")
+                                            di64 = get_digital_input(4,63)
+                                            while(di64 == 0):
+                                                sleep(0.1)
+                                                di64 = get_digital_input(4,63)
+                                            end
+
+                                            set_digital_output(4,63,0,1)
+                                            if(case_motion_ok == 1):
+                                                log_message(1,"P2C2 DI64 ON DO64 OFF CLAMP COMPLETE")
+                                                log_message(1,"CNC CASE2 MOVEL C1UNLOAD TO C1UNLOADDOWN START")
+                                                log_message(1,"P2C2 RETURN C1UNLOADWAIT START")
+                                                at_c1_unload = 0
+                                                p_c1_unload_down_pose = kine_forward(p_odd_unload_down)
+                                                movl(p_c1_unload_down_pose,0,speed_movel,200,0)
+                                                log_message(1,"CNC CASE2 C1UNLOADDOWN COMPLETE")
+                                                p_c1_unload_wait_pose = kine_forward(p_odd_unload_wait)
+                                                movl(p_c1_unload_wait_pose,0,speed_movel_fast,3500,0)
+                                                at_c1_unload_wait = 1
+                                                home_route_hint = 1
+                                                log_message(1,"P2C2 RETURN C1UNLOADWAIT COMPLETE")
+                                                log_message(1,"P2C2 END AT C1UNLOADWAIT")
+                                            else:
+                                                log_message(2,"P2C2 ABORTED DO64 OFF")
+                                            end
+                                            end
+                                    else:
+                                       if(cnc_motion_case == 31):
+                                            door_select = 2
+                                            last_door_select = 2
+                                            log_message(1,"P2C3 PROCESS EXIT DOOR FORCED TO DOORC2")
+                                            
+                                            # Step 1: Move to AirC2v1, then run DO74/DI74.
+                                            log_message(1,"P2C3 ENTRY MOVEL AIRC2V1 START")
+                                            p_air_c2v1_pose = kine_forward(p_even_air_v1)
+                                            movl(p_air_c2v1_pose,0,speed_movel_fast,3500,0)
+                                            log_message(1,"P2C3 AIRC2V1 COMPLETE")
+
+                                            set_digital_output(4,73,1,1)
+                                            log_message(1,"CNC CASE3 DO74 ON WAIT DI74 ON AIR BLOW AT AIRC2V1")
+                                            wait_input(4,73,1,0)
+                                            set_digital_output(4,73,0,1)
+                                            log_message(1,"DI74 ON DO74 OFF AIR BLOW ACCEPTED")
+
+                                            # Step 2: Slow transition between the two CNC2 air points.
+                                            log_message(1,"P2C3 MOVEL AIRC2 START")
+                                            p_air_c2_pose = kine_forward(p_even_air)
+                                            movl(p_air_c2_pose,0,30,200,0)
+                                            at_air_c2 = 1
+                                            home_route_hint = 2
+                                            log_message(1,"P2C3 AIRC2 COMPLETE")
+
+                                            set_digital_output(4,74,1,1)
+                                            log_message(1,"P2C3 DO75 ON WAIT DI75 ON AT AIRC2")
+                                            wait_input(4,74,1,0)
+                                            set_digital_output(4,74,0,1)
+                                            log_message(1,"P2C3 DI75 ON DO75 OFF COMPLETE")
+
+                                            log_message(1,"P2C3 MOVEJ LOADM2_WAIT START")
+                                            at_air_c2 = 0
+                                            # Blend only at the approach wait point.
+                                            p_load_m2_wait_pose = kine_forward(p_even_load_wait)
+                                            p_load_m2_wait_pose = pose_add(p_load_m2_wait_pose,p_even_user_x_offset)
+                                            p_load_m2_wait_offset_joint = kine_inverse(p_even_load_wait,p_load_m2_wait_pose)
+                                            movj(p_load_m2_wait_offset_joint,0,speed_movej_fast,720,10)
+                                            at_load_m2_wait = 1
+                                            home_route_hint = 2
+                                            log_message(1,"P2C3 LOADM2_WAIT COMPLETE")
+
+                                            if(case_motion_ok == 1):
+                                                log_message(1,"P2C3 MOVEL LOADM2_WAIT TO LOADC2 START")
+                                                at_load_m2_wait = 0
+                                                p_load_c2_pose = kine_forward(p_even_load)
+                                                p_load_c2_pose = pose_add(p_load_c2_pose,p_even_user_x_offset)
+                                                movl(p_load_c2_pose,0,30,200,0)
+                                                home_route_hint = 2
+                                                log_message(1,"P2C3 LOADC2 COMPLETE")
+
+                                                set_digital_output(4,60,1,1)
+                                                log_message(1,"P2C3 AT LOADC2 DO61 ON WAIT DI61 ON RELEASE CLAMP")
+                                                di61 = get_digital_input(4,60)
+                                                while(di61 == 0):
+                                                    sleep(0.1)
+                                                    di61 = get_digital_input(4,60)
+                                                end
+                                                set_digital_output(4,60,0,1)
+                                                log_message(1,"P2C3 DI61 ON DO61 OFF RELEASE COMPLETE")
+
+                                                log_message(1,"P2C3 MOVEL LOADC2 TO ENDLOADM2V1 START")
+                                                p_end_load_m2v1_pose = kine_forward(p_even_load_end)
+                                                p_end_load_m2v1_pose = pose_add(p_end_load_m2v1_pose,p_even_user_x_offset)
+                                                movl(p_end_load_m2v1_pose,0,30,200,0)
+                                                home_route_hint = 2
+                                                log_message(1,"P2C3 ENDLOADM2V1 COMPLETE")
+
+                                                # [CNC36] DO78/DI78 = Clamp Chuck of the even CNC, shared by P2/P3/P4 (confirmed 2026-11):
+                                                # the PLC clamps CNC2, CNC4 or CNC6 according to the active Process.
+                                                set_digital_output(4,77,1,1)
+                                                log_message(1,"P2C3 AT ENDLOADM2V1 DO78 ON WAIT DI78 ON")
+                                                di78 = get_digital_input(4,77)
+                                                while(di78 == 0):
+                                                    sleep(0.1)
+                                                    di78 = get_digital_input(4,77)
+                                                end
+                                                set_digital_output(4,77,0,1)
+                                                log_message(1,"P2C3 DI78 ON DO78 OFF COMPLETE")
+
+                                                log_message(1,"P2C3 MOVEL ENDLOADM2V1 TO LOADC2 START")
+                                                p_load_c2_pose = kine_forward(p_even_load)
+                                                p_load_c2_pose = pose_add(p_load_c2_pose,p_even_user_x_offset)
+                                                movl(p_load_c2_pose,0,30,200,0)
+                                                home_route_hint = 2
+                                                log_message(1,"P2C3 RETURN LOADC2 COMPLETE")
+
+                                                log_message(1,"P2C3 MOVEL LOADC2 TO LOADM2_WAIT START")
+                                                p_load_m2_wait_pose = kine_forward(p_even_load_wait)
+                                                p_load_m2_wait_pose = pose_add(p_load_m2_wait_pose,p_even_user_x_offset)
+                                                movl(p_load_m2_wait_pose,0,speed_movel_fast,3500,0)
+                                                at_load_m2_wait = 1
+                                                home_route_hint = 2
+                                                log_message(1,"P2C3 RETURN LOADM2_WAIT COMPLETE")
+
+                                                log_message(1,"P2C3 END AT LOADM2_WAIT")
+                                            else:
+                                                log_message(2,"P2C3 ABORTED")
+                                            end
+                                        else:
+                                            if(cnc_motion_case == 32):
+                                                log_message(1,"CURRENT P2 CASE4 UNLOAD CNC2 RUN AIRC2V1 THEN AIRC2")
+                                                door_select = 2
+                                                last_door_select = 2
+                                                log_message(1,"P2C4 PROCESS EXIT DOOR FORCED TO DOORC2")
+                                                
+                                                # Step 1: Move to AirC2v1, then run DO74/DI74.
+                                                log_message(1,"P2C4 ENTRY MOVEL AIRC2V1 START")
+                                                p_air_c2v1_pose = kine_forward(p_even_air_v1)
+                                                movl(p_air_c2v1_pose,0,speed_movel_fast,3500,0)
+                                                log_message(1,"P2C4 AIRC2V1 COMPLETE")
+
+                                                set_digital_output(4,73,1,1)
+                                                log_message(1,"CNC CASE4 DO74 ON WAIT DI74 ON AIR BLOW AT AIRC2V1")
+                                                wait_input(4,73,1,0)
+                                                set_digital_output(4,73,0,1)
+                                                log_message(1,"DI74 ON DO74 OFF AIR BLOW ACCEPTED")
+
+                                                # Step 2: Slow transition between the two CNC2 air points.
+                                                log_message(1,"P2C4 MOVEL AIRC2 START")
+                                                p_air_c2_pose = kine_forward(p_even_air)
+                                                movl(p_air_c2_pose,0,30,200,0)
+                                                at_air_c2 = 1
+                                                home_route_hint = 2
+                                                log_message(1,"P2C4 AIRC2 COMPLETE")
+
+                                                set_digital_output(4,74,1,1)
+                                                log_message(1,"P2C4 DO75 ON WAIT DI75 ON AT AIRC2")
+                                                wait_input(4,74,1,0)
+                                                set_digital_output(4,74,0,1)
+                                                log_message(1,"P2C4 DI75 ON DO75 OFF COMPLETE")
+
+                                                log_message(1,"P2C4 MOVEJ UNLOADM2_WAIT START")
+                                                at_air_c2 = 0
+                                                # Blend only at the approach wait point.
+                                                movj(p_even_unload_wait,0,speed_movej_fast,720,10)
+                                                at_unload_m2_wait = 1
+                                                home_route_hint = 2
+                                                log_message(1,"P2C4 UNLOADM2_WAIT COMPLETE")
+
+                                                if(case_motion_ok == 1):
+                                                log_message(1,"P2C4 MOVEL UNLOADM2_WAIT TO UNLOADM2 START")
+                                                at_unload_m2_wait = 0
+                                                p_unload_m2_pose = kine_forward(p_even_unload)
+                                                movl(p_unload_m2_pose,0,speed_movel,200,0)
+                                                at_unload_m2 = 1
+                                                home_route_hint = 2
+                                                log_message(1,"P2C4 UNLOADM2 COMPLETE")
+
+                                                set_digital_output(4,63,1,1)
+                                                log_message(1,"P2C4 DO64 ON WAIT DI64 ON CLAMP UNLOAD")
+                                                di64 = get_digital_input(4,63)
+                                                while(di64 == 0):
+                                                    sleep(0.1)
+                                                    di64 = get_digital_input(4,63)
+                                                end
+
+                                                set_digital_output(4,63,0,1)
+                                                if(case_motion_ok == 1):
+                                                    log_message(1,"P2C4 DI64 ON DO64 OFF CLAMP COMPLETE")
+                                                    log_message(1,"CNC CASE4 MOVEL UNLOADM2 TO UNLOADM2_WAIT START")
+                                                    at_unload_m2 = 0
+                                                    p_unload_m2_wait_pose = kine_forward(p_even_unload_wait)
+                                                    movl(p_unload_m2_wait_pose,0,speed_movel_fast,3500,0)
+                                                    at_unload_m2_wait = 1
+                                                    home_route_hint = 2
+                                                    log_message(1,"P2C4 RETURN UNLOADM2_WAIT COMPLETE")
+                                                    log_message(1,"P2C4 END AT UNLOADM2_WAIT")
+                                                else:
+                                                    log_message(2,"P2C4 ABORTED DO64 OFF")
+                                                end
+                                                end
+                                            else:
+                                                log_message(1,"CURRENT P2 CASE MOTION NOT ADDED")
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                            if(active_process == 3):
+                                log_message(1,"CURRENT P3 CASE MOTION COMPLETE")
+                            end
+                            if(active_process == 4):
+                                log_message(1,"CURRENT P4 CASE MOTION COMPLETE")
+                            end
+                            if(active_process == 5):
+                                if(active_case == 44):
+                                    log_message(1,"CURRENT P5 CASE1 PUT CLEAN UNIT RUN")
+                                    log_message(1,"P5C1 MOVEJ CLEANPOSITIONWAIT START")
+                                    movj(p_clean_position_wait,0,speed_movej_fast,720,0)
+                                    log_message(1,"P5C1 CLEANPOSITIONWAIT COMPLETE")
+
+                                    log_message(1,"P5C1 MOVEJ CLEANPOSITION START")
+                                    movj(p_clean_position,0,speed_movej,200,0)
+                                    log_message(1,"P5C1 CLEANPOSITION COMPLETE")
+
+                                    set_digital_output(4,64,1,1)
+                                    log_message(1,"P5C1 DO65 ON WAIT DI65 ON UNCLAMP TOOL UNLOAD")
+                                    di65 = get_digital_input(4,64)
+                                    while(di65 == 0):
+                                        sleep(0.1)
+                                        di65 = get_digital_input(4,64)
+                                    end
+                                    set_digital_output(4,64,0,1)
+
+                                    if(case_motion_ok == 1):
+                                        log_message(1,"P5C1 DI65 ON DO65 OFF UNCLAMP COMPLETE")
+                                        set_digital_output(4,67,1,1)
+                                        log_message(1,"P5C1 DO68 ON WAIT DI68 ON CLAMP CLEAN UNIT")
+                                        di68 = get_digital_input(4,67)
+                                        while(di68 == 0):
+                                            sleep(0.1)
+                                            di68 = get_digital_input(4,67)
+                                        end
+                                        set_digital_output(4,67,0,1)
+                                    end
+
+                                    if(case_motion_ok == 1):
+                                        log_message(1,"P5C1 DI68 ON DO68 OFF CLAMP COMPLETE")
+                                        log_message(1,"P5C1 RETURN CLEANPOSITIONWAIT START")
+                                        movj(p_clean_position_wait,0,speed_movej_fast,720,0)
+                                        log_message(1,"P5C1 RETURN CLEANPOSITIONWAIT COMPLETE")
+
+                                        log_message(1,"P5C1 MOVEJ HOMELOCATION START")
+                                        movj(p_home_location,0,speed_movej_fast,720,0)
+                                        log_message(1,"P5C1 HOMELOCATION COMPLETE")
+                                    else:
+                                        set_digital_output(4,64,0,1)
+                                        set_digital_output(4,67,0,1)
+                                        log_message(2,"P5C1 ABORTED DO65 OFF DO68 OFF")
+                                    end
+                                else:
+                                    if(active_case == 45):
+                                        log_message(1,"CURRENT P5 CASE2 GET CLEAN UNIT RUN")
+                                        log_message(1,"P5C2 MOVEJ CLEANPOSITIONWAIT START")
+                                        movj(p_clean_position_wait,0,speed_movej_fast,720,0)
+                                        log_message(1,"P5C2 CLEANPOSITIONWAIT COMPLETE")
+                                        log_message(1,"P5C2 MOVEJ CLEANPOSITION START")
+                                        movj(p_clean_position,0,speed_movej,200,0)
+                                        log_message(1,"P5C2 CLEANPOSITION COMPLETE")
+
+                                        set_digital_output(4,63,1,1)
+                                        log_message(1,"P5C2 DO64 ON WAIT DI64 ON CLAMP TOOL UNLOAD")
+                                        di64 = get_digital_input(4,63)
+                                        while(di64 == 0):
+                                            sleep(0.1)
+                                            di64 = get_digital_input(4,63)
+                                        end
+                                        set_digital_output(4,63,0,1)
+
+                                        if(case_motion_ok == 1):
+                                            log_message(1,"P5C2 DI64 ON DO64 OFF CLAMP COMPLETE")
+                                            set_digital_output(4,68,1,1)
+                                            log_message(1,"P5C2 DO69 ON WAIT DI69 ON UNCLAMP CLEAN UNIT")
+                                            di69 = get_digital_input(4,68)
+                                            while(di69 == 0):
+                                                sleep(0.1)
+                                                di69 = get_digital_input(4,68)
+                                            end
+                                            set_digital_output(4,68,0,1)
+                                        end
+
+                                        if(case_motion_ok == 1):
+                                            log_message(1,"P5C2 DI69 ON DO69 OFF UNCLAMP COMPLETE")
+                                            log_message(1,"P5C2 RETURN CLEANPOSITIONWAIT START")
+                                            movj(p_clean_position_wait,0,speed_movej_fast,720,0)
+                                            log_message(1,"P5C2 RETURN CLEANPOSITIONWAIT COMPLETE")
+                                        else:
+                                            set_digital_output(4,63,0,1)
+                                            set_digital_output(4,68,0,1)
+                                            log_message(2,"P5C2 ABORTED DO64 OFF DO69 OFF")
+                                        end
+                                    else:
+                                        log_message(1,"CURRENT P5 CASE MOTION NOT ADDED")
+                                    end
+                                end
+                            end
+                            if(active_process == 6):
+                                if(active_case == 47):
+                                    log_message(1,"CURRENT P6 CASE1 PUT BAVIA RUN")
+                                    log_message(1,"P6C1 MOVEJ PROCESS6PUT1SAFE TEMP START")
+                                    movj(p_process6_put1_safe,0,speed_movej_fast,720,0)
+                                    log_message(1,"P6C1 PROCESS6PUT1SAFE TEMP COMPLETE")
+                                    log_message(1,"P6C1 MOVEJ PROCESS6PUT1 TEMP START")
+                                    movj(p_process6_put1,0,speed_movej,200,0)
+                                    log_message(1,"P6C1 PROCESS6PUT1 TEMP COMPLETE")
+
+                                    set_digital_output(4,69,1,1)
+                                    log_message(1,"P6C1 DO70 ON WAIT DI70 ON CLAMP BAVIA UNIT")
+                                    di70 = get_digital_input(4,69)
+                                    while(di70 == 0):
+                                        sleep(0.05)
+                                        di70 = get_digital_input(4,69)
+                                    end
+                                    set_digital_output(4,69,0,1)
+
+                                    if(case_motion_ok == 1):
+                                        log_message(1,"P6C1 DI70 ON DO70 OFF CLAMP BAVIA ACCEPTED")
+                                        set_digital_output(4,64,1,1)
+                                        log_message(1,"P6C1 DO65 ON WAIT DI65 ON UNCLAMP TOOL UNLOAD")
+                                        di65 = get_digital_input(4,64)
+                                        while(di65 == 0):
+                                            sleep(0.05)
+                                            di65 = get_digital_input(4,64)
+                                        end
+                                        set_digital_output(4,64,0,1)
+                                    end
+
+                                    if(case_motion_ok == 1):
+                                        log_message(1,"P6C1 DI65 ON DO65 OFF UNCLAMP TOOL UNLOAD ACCEPTED")
+                                        log_message(1,"P6C1 RETURN PROCESS6PUT1SAFE START")
+                                        movj(p_process6_put1_safe,0,speed_movej_fast,720,0)
+                                        log_message(1,"P6C1 RETURN PROCESS6PUT1SAFE COMPLETE")
+                                    else:
+                                        set_digital_output(4,64,0,1)
+                                        set_digital_output(4,69,0,1)
+                                        log_message(2,"P6C1 ABORTED DO65 OFF DO70 OFF")
+                                    end
+                                else:
+                                    if(active_case == 48):
+                                        log_message(1,"CURRENT P6 CASE2 GET BAVIA RUN")
+                                        log_message(1,"P6C2 MOVEJ PROCESS6PUT1SAFE TEMP START")
+                                        movj(p_process6_put1_safe,0,speed_movej_fast,720,0)
+                                        log_message(1,"P6C2 PROCESS6PUT1SAFE TEMP COMPLETE")
+                                        log_message(1,"P6C2 MOVEJ PROCESS6PUT1 TEMP START")
+                                        movj(p_process6_put1,0,speed_movej,200,0)
+                                        log_message(1,"P6C2 PROCESS6PUT1 TEMP COMPLETE")
+                                        set_digital_output(4,63,1,1)
+                                        log_message(1,"P6C2 DO64 ON WAIT DI64 ON CLAMP TOOL UNLOAD")
+                                        di64 = get_digital_input(4,63)
+                                        while(di64 == 0):
+                                            sleep(0.05)
+                                            di64 = get_digital_input(4,63)
+                                        end
+                                        set_digital_output(4,63,0,1)
+                                        if(case_motion_ok == 1):
+                                            log_message(1,"P6C2 DI64 ON DO64 OFF CLAMP TOOL UNLOAD ACCEPTED")
+                                            set_digital_output(4,70,1,1)
+                                            log_message(1,"P6C2 DO71 ON WAIT DI71 ON UNCLAMP BAVIA UNIT")
+                                            di71 = get_digital_input(4,70)
+                                            while(di71 == 0):
+                                                sleep(0.05)
+                                                di71 = get_digital_input(4,70)
+                                            end
+                                            set_digital_output(4,70,0,1)
+                                            if(case_motion_ok == 1):
+                                                log_message(1,"P6C2 DI71 ON DO71 OFF UNCLAMP BAVIA ACCEPTED")
+                                                log_message(1,"P6C2 RETURN PROCESS6PUT1SAFE START")
+                                                movj(p_process6_put1_safe,0,speed_movej_fast,720,0)
+                                                log_message(1,"P6C2 RETURN PROCESS6PUT1SAFE COMPLETE")
+                                            else:
+                                                log_message(2,"P6C2 ABORTED DO71 OFF")
+                                            end
+                                        else:
+                                            set_digital_output(4,70,0,1)
+                                            log_message(2,"P6C2 ABORTED DO64 OFF")
+                                        end
+                                    else:
+                                        if(active_case == 49):
+                                            log_message(1,"CURRENT P6 CASE3 PUT BAVIA RUN SHARED POINTS")
+                                            log_message(1,"P6C3 MOVEJ BAVIA_WAIT START")
+                                            movj(p_process6_put1_safe,0,speed_movej_fast,720,0)
+                                            log_message(1,"P6C3 BAVIA_WAIT COMPLETE")
+                                            log_message(1,"P6C3 MOVEJ BAVIA START")
+                                            movj(p_process6_put1,0,speed_movej,200,0)
+                                            log_message(1,"P6C3 BAVIA COMPLETE")
+
+                                            set_digital_output(4,69,1,1)
+                                            log_message(1,"P6C3 DO70 ON WAIT DI70 ON CLAMP BAVIA UNIT")
+                                            wait_input(4,69,1,0)
+                                            set_digital_output(4,69,0,1)
+                                            log_message(1,"P6C3 DI70 ON DO70 OFF CLAMP BAVIA ACCEPTED")
+
+                                            set_digital_output(4,64,1,1)
+                                            log_message(1,"P6C3 DO65 ON WAIT DI65 ON UNCLAMP TOOL UNLOAD")
+                                            wait_input(4,64,1,0)
+                                            set_digital_output(4,64,0,1)
+                                            log_message(1,"P6C3 DI65 ON DO65 OFF UNCLAMP TOOL UNLOAD ACCEPTED")
+
+                                            log_message(1,"P6C3 RETURN BAVIA_WAIT START")
+                                            movj(p_process6_put1_safe,0,speed_movej_fast,720,0)
+                                            log_message(1,"P6C3 RETURN BAVIA_WAIT COMPLETE")
+                                        else:
+                                            if(active_case == 50):
+                                                log_message(1,"CURRENT P6 CASE4 GET BAVIA RUN SHARED POINTS")
+                                                log_message(1,"P6C4 MOVEJ BAVIA_WAIT START")
+                                                movj(p_process6_put1_safe,0,speed_movej_fast,720,0)
+                                                log_message(1,"P6C4 BAVIA_WAIT COMPLETE")
+                                                log_message(1,"P6C4 MOVEJ BAVIA START")
+                                                movj(p_process6_put1,0,speed_movej,200,0)
+                                                log_message(1,"P6C4 BAVIA COMPLETE")
+
+                                                set_digital_output(4,63,1,1)
+                                                log_message(1,"P6C4 DO64 ON WAIT DI64 ON CLAMP TOOL UNLOAD")
+                                                wait_input(4,63,1,0)
+                                                set_digital_output(4,63,0,1)
+                                                log_message(1,"P6C4 DI64 ON DO64 OFF CLAMP TOOL UNLOAD ACCEPTED")
+
+                                                set_digital_output(4,70,1,1)
+                                                log_message(1,"P6C4 DO71 ON WAIT DI71 ON UNCLAMP BAVIA UNIT")
+                                                wait_input(4,70,1,0)
+                                                set_digital_output(4,70,0,1)
+                                                log_message(1,"P6C4 DI71 ON DO71 OFF UNCLAMP BAVIA ACCEPTED")
+
+                                                log_message(1,"P6C4 RETURN BAVIA_WAIT START")
+                                                movj(p_process6_put1_safe,0,speed_movej_fast,720,0)
+                                                log_message(1,"P6C4 RETURN BAVIA_WAIT COMPLETE")
+                                            else:
+                                                case_motion_ok = 0
+                                                log_message(1,"CURRENT P6 CASE MOTION NOT ADDED")
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                            if(active_process == 7):
+                                if(active_case == 52):
+                                    log_message(1,"CURRENT P7 CASE1 DROP OUTSIDE RUN")
+                                    # Safety check: the lift offset must be +100 mm straight up (Z), X/Y unchanged.
+                                    # If pose_add works in another frame the drop is skipped instead of moving the wrong way.
+                                    drop_ok = 1
+                                    if(p_drop_above_pose[2] < p_drop_pose[2] + 90.0):
+                                        drop_ok = 0
+                                    end
+                                    if(p_drop_above_pose[2] > p_drop_pose[2] + 110.0):
+                                        drop_ok = 0
+                                    end
+                                    if(p_drop_above_pose[0] > p_drop_pose[0] + 5.0):
+                                        drop_ok = 0
+                                    end
+                                    if(p_drop_above_pose[0] < p_drop_pose[0] - 5.0):
+                                        drop_ok = 0
+                                    end
+                                    if(p_drop_above_pose[1] > p_drop_pose[1] + 5.0):
+                                        drop_ok = 0
+                                    end
+                                    if(p_drop_above_pose[1] < p_drop_pose[1] - 5.0):
+                                        drop_ok = 0
+                                    end
+                                    if(drop_ok == 0):
+                                        case_motion_ok = 0
+                                        log_message(2,"P7C1 DROP SKIPPED LIFT OFFSET IS NOT STRAIGHT UP CHECK POSE_ADD")
+                                    end
+                                    if(case_motion_ok == 1):
+                                        log_message(1,"P7C1 MOVEJ HOMELOCATION START")
+                                        movj(p_home_location,0,speed_movej_fast,720,0)
+                                        log_message(1,"P7C1 HOMELOCATION COMPLETE")
+                                        log_message(1,"P7C1 MOVEJ DROP ABOVE START")
+                                        movj(p_drop_above_joint,0,speed_movej_fast,720,0)
+                                        log_message(1,"P7C1 DROP ABOVE COMPLETE")
+                                        log_message(1,"P7C1 MOVEL DOWN TO DROP START")
+                                        movl(p_drop_pose,0,speed_movel,200,0)
+                                        log_message(1,"P7C1 DROP COMPLETE")
+                                        set_digital_output(4,64,1,1)
+                                        log_message(1,"P7C1 DO65 ON WAIT DI65 ON UNCLAMP TOOL UNLOAD")
+                                        di65 = get_digital_input(4,64)
+                                        while(di65 == 0):
+                                            sleep(0.1)
+                                            di65 = get_digital_input(4,64)
+                                        end
+                                        set_digital_output(4,64,0,1)
+                                        log_message(1,"P7C1 DI65 ON DO65 OFF UNCLAMP COMPLETE")
+                                        log_message(1,"P7C1 MOVEL LIFT Z 100 START")
+                                        movl(p_drop_above_pose,0,speed_movel_fast,3500,0)
+                                        log_message(1,"P7C1 LIFT Z 100 COMPLETE")
+                                        log_message(1,"P7C1 MOVEJ HOMELOCATION START")
+                                        movj(p_home_location,0,speed_movej_fast,720,0)
+                                        log_message(1,"P7C1 END AT HOMELOCATION")
+                                    else:
+                                        set_digital_output(4,64,0,1)
+                                        log_message(2,"P7C1 ABORTED DO65 OFF")
+                                    end
+                                end
+                            end
+                            if(active_process == 8):
+                                if(active_case == 54):
+                                    log_message(1,"CURRENT P8 CASE1 CHANGE TOOL RUN")
+                                    log_message(1,"P8C1 MOVEJ UNLOAD_DAOTOOL_WAIT START")
+                                    # Pass through the wait point toward the exact tool point.
+                                    movj(p_unload_daotool_wait,0,speed_movej_fast,720,10)
+                                    log_message(1,"P8C1 UNLOAD_DAOTOOL_WAIT COMPLETE")
+
+                                    log_message(1,"P8C1 MOVEJ UNLOAD_DAOTOOL START")
+                                    movj(p_unload_daotool,0,speed_movej,200,0)
+                                    log_message(1,"P8C1 UNLOAD_DAOTOOL COMPLETE")
+
+                                    set_digital_output(4,65,1,1)
+                                    log_message(1,"P8C1 DO66 ON WAIT DI66 ON CLAMP CHANGE TOOL")
+                                    di66 = get_digital_input(4,65)
+                                    while(di66 == 0):
+                                        sleep(0.1)
+                                        di66 = get_digital_input(4,65)
+                                    end
+                                    set_digital_output(4,65,0,1)
+
+                                    if(case_motion_ok == 1):
+                                        log_message(1,"P8C1 DI66 ON DO66 OFF CLAMP COMPLETE")
+                                        set_digital_output(4,64,1,1)
+                                        log_message(1,"P8C1 DO65 ON WAIT DI65 ON UNCLAMP TOOL UNLOAD")
+                                        di65 = get_digital_input(4,64)
+                                        while(di65 == 0):
+                                            sleep(0.1)
+                                            di65 = get_digital_input(4,64)
+                                        end
+                                        set_digital_output(4,64,0,1)
+                                    end
+
+                                    if(case_motion_ok == 1):
+                                        log_message(1,"P8C1 DI65 ON DO65 OFF UNCLAMP COMPLETE")
+                                        log_message(1,"P8C1 RETURN UNLOAD_DAOTOOL_WAIT START")
+                                        movj(p_unload_daotool_wait,0,speed_movej_fast,720,10)
+                                        log_message(1,"P8C1 RETURN WAIT COMPLETE")
+                                        log_message(1,"P8C1 MOVEJ TRUNGGIAN_UNLOAD START")
+                                        movj(p_trunggian_unload,0,speed_movej_fast,720,10)
+                                        log_message(1,"P8C1 TRUNGGIAN_UNLOAD COMPLETE")
+                                        log_message(1,"P8C1 MOVEJ LOAD_DAOTOOL_WAIT START")
+                                        movj(p_load_daotool_wait,0,speed_movej_fast,720,10)
+                                        log_message(1,"P8C1 LOAD_DAOTOOL_WAIT COMPLETE")
+                                        log_message(1,"P8C1 MOVEL LOAD_DAOTOOL START")
+                                        # [CNC36] Straight 30 mm descent: MoveL (was MoveJ). Joint point -> TCP pose by kine_forward.
+                                        p_load_daotool_pose = kine_forward(p_load_daotool)
+                                        movl(p_load_daotool_pose,0,speed_movel,200,0)
+                                        log_message(1,"P8C1 LOAD_DAOTOOL COMPLETE")
+
+                                        set_digital_output(4,59,1,1)
+                                        log_message(1,"P8C1 DO60 ON WAIT DI60 ON CLAMP TOOL LOAD")
+                                        di60 = get_digital_input(4,59)
+                                        while(di60 == 0):
+                                            sleep(0.1)
+                                            di60 = get_digital_input(4,59)
+                                        end
+                                        set_digital_output(4,59,0,1)
+                                    end
+
+                                    if(case_motion_ok == 1):
+                                        log_message(1,"P8C1 DI60 ON DO60 OFF CLAMP TOOL LOAD COMPLETE")
+                                        set_digital_output(4,66,1,1)
+                                        log_message(1,"P8C1 DO67 ON WAIT DI67 ON UNCLAMP CHANGE TOOL")
+                                        di67 = get_digital_input(4,66)
+                                        while(di67 == 0):
+                                            sleep(0.1)
+                                            di67 = get_digital_input(4,66)
+                                        end
+                                        set_digital_output(4,66,0,1)
+                                    end
+
+                                    if(case_motion_ok == 1):
+                                        log_message(1,"P8C1 DI67 ON DO67 OFF UNCLAMP COMPLETE")
+                                        log_message(1,"P8C1 RETURN LOAD_DAOTOOL_WAIT START")
+                                        movj(p_load_daotool_wait,0,speed_movej_fast,720,10)
+                                        log_message(1,"P8C1 RETURN LOAD_DAOTOOL_WAIT COMPLETE")
+                                        log_message(1,"P8C1 MOVEJ HOMELOCATION START")
+                                        movj(p_home_location,0,speed_movej_fast,720,0)
+                                        log_message(1,"P8C1 HOMELOCATION COMPLETE")
+                                    else:
+                                        set_digital_output(4,59,0,1)
+                                        set_digital_output(4,64,0,1)
+                                        set_digital_output(4,65,0,1)
+                                        set_digital_output(4,66,0,1)
+                                        log_message(2,"P8C1 ABORTED DO60 DO65 DO66 DO67 OFF")
+                                    end
+                                end
+                            end
+
+                            # Other Processes still require their taught-point motions.
+                            # Assert Case Complete only after motion/action succeeds.
+
+                            if(case_motion_ok == 1):
+                                last_completed_case = active_case
+                                case_completed = 1
+                                if(active_case == 27):
+                                    set_digital_output(4,27,1,1)
+                                else:
+                                    set_digital_output(4,active_case,1,1)
+                                end
+                                if(active_case == 27):
+                                log_message(1,"P1 CASE1 DO28 ON HOLD UNTIL DI17 ON")
+                                end
+                            if(active_case == 29):
+                                log_message(1,"P2 CASE1 DO30 ON HOLD UNTIL DI17 ON")
+                            end
+                            if(active_case == 30):
+                                log_message(1,"P2 CASE2 DO31 ON HOLD UNTIL DI17 ON")
+                            end
+                            if(active_case == 31):
+                                log_message(1,"P2 CASE3 DO32 ON HOLD UNTIL DI17 ON")
+                            end
+                            if(active_case == 32):
+                                log_message(1,"P2 CASE4 DO33 ON HOLD UNTIL DI17 ON")
+                            end
+                            if(active_case == 34):
+                                log_message(1,"P3 CASE1 DO35 ON HOLD UNTIL DI17 ON")
+                            end
+                            if(active_case == 35):
+                                log_message(1,"P3 CASE2 DO36 ON HOLD UNTIL DI17 ON")
+                            end
+                            if(active_case == 36):
+                                log_message(1,"P3 CASE3 DO37 ON HOLD UNTIL DI17 ON")
+                            end
+                            if(active_case == 37):
+                                log_message(1,"P3 CASE4 DO38 ON HOLD UNTIL DI17 ON")
+                            end
+                            if(active_case == 39):
+                                log_message(1,"P4 CASE1 DO40 ON HOLD UNTIL DI17 ON")
+                            end
+                            if(active_case == 40):
+                                log_message(1,"P4 CASE2 DO41 ON HOLD UNTIL DI17 ON")
+                            end
+                            if(active_case == 41):
+                                log_message(1,"P4 CASE3 DO42 ON HOLD UNTIL DI17 ON")
+                            end
+                            if(active_case == 42):
+                                log_message(1,"P4 CASE4 DO43 ON HOLD UNTIL DI17 ON")
+                            end
+                            if(active_case == 44):
+                                log_message(1,"P5 CASE1 DO45 ON HOLD UNTIL DI17 ON")
+                            end
+                            if(active_case == 45):
+                                log_message(1,"P5 CASE2 DO46 ON HOLD UNTIL DI17 ON")
+                            end
+                            if(active_case == 47):
+                                log_message(1,"P6 CASE1 DO48 ON HOLD UNTIL DI17 ON")
+                            end
+                            if(active_case == 48):
+                                log_message(1,"P6 CASE2 DO49 ON HOLD UNTIL DI17 ON")
+                            end
+                            if(active_case == 49):
+                                log_message(1,"P6 CASE3 DO50 ON HOLD UNTIL DI17 ON")
+                            end
+                            if(active_case == 50):
+                                log_message(1,"P6 CASE4 DO51 ON HOLD UNTIL DI17 ON")
+                            end
+                                if(active_case == 52):
+                                    log_message(1,"P7 CASE1 DO53 ON HOLD UNTIL DI17 ON")
+                                end
+                                if(active_case == 54):
+                                    log_message(1,"P8 CASE1 DO55 ON HOLD UNTIL DI17 ON")
+                                end
+                            else:
+                                log_message(2,"CASE ABORT HOLD UNTIL DI17 ON")
+                            end
+                        end
+                    else:
+                        # Keep Case Complete output ON and prevent retrigger.
+                        # DI17 handler clears the Case output and returns to Process scan.
+                        case_hold_until_di17 = 1
+                    end
+                end
+            end
+        end
+    end
+
+    sleep(0.1)
+end

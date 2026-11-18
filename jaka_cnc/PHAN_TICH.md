@@ -323,3 +323,16 @@ Khác code gốc: chỉ thêm các dòng `ACTIVE POINT SET CNC1 CNC2`.
   3. Ghi lại tool / user frame đang chọn khi chạy (ngưỡng đo với tool "thanh").
   4. Quan sát DO56/57/58 trên màn hình IO: đứng ở cửa → OFF; vào CNC lẻ → DO56 ON; CNC chẵn → DO57 ON; Pick → DO58 ON.
   5. Chỉnh `zone_door_margin` nếu bit bật quá sớm/muộn quanh cửa.
+
+## 19. Chương trình riêng `drop/jamaguchi_cnc1_drop.txt` (2026-11-18)
+
+Sinh từ `jamaguchi_cnc36.txt` bằng `drop/tao_drop.py`; chỉ đổi P7, mọi phần khác giữ nguyên.
+* Chu trình: P2 Unload CNC1 (DI31) → DI17 → DI16 thoát (robot ở DoorC1) → PLC bật **P7 (DI24) → Case DI53**:
+  MoveJ HomeLocation → MoveJ điểm trên cao (điểm thả + Z 100 mm) → MoveL xuống điểm thả →
+  DO65/DI65 nhả Tool Unload → MoveL nhấc Z 100 mm → MoveJ HomeLocation → DO53 Case Comp.
+* `p_drop` hiện là **PLACEHOLDER** (= `p_process7_unload`), cần teach điểm thả thật.
+* Kiểm tra an toàn: nếu `pose_add` không cho ra đúng +100 mm theo Z (X/Y lệch > 5 mm), Case bị bỏ,
+  log `P7C1 DROP SKIPPED LIFT OFFSET IS NOT STRAIGHT UP CHECK POSE_ADD`.
+* Home DI90: thay vùng nhận diện P7 cũ bằng đoạn điểm thả ↔ điểm trên cao (±5°, tự tính từ điểm);
+  đường lùi = MoveL thẳng lên điểm trên cao (30 mm/s) → Home.
+* Test Simulation: `drop/sim_drop_test.txt`, `drop/sim_drop_home_test.txt`.
