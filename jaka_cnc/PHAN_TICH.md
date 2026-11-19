@@ -396,4 +396,8 @@ Chuẩn bị: giữ `jamaguchi_cnc36.txt` trên bộ điều khiển (tên khác
 * ⇒ `get_atl_tcp_pose()` / `kine_forward()` trả về tọa độ Base; **công thức Base→usrfr_thanh của code gốc là đúng**,
   vùng nguy hiểm khi Home **không lỗi**. (Nhận định "đổi hệ hai lần" trước đó là sai, đã hủy.)
 * `zone_monitor` dùng lại công thức (tính 1 lần vào `zone_xu`/`zone_yu`). Sai số công thức so với hệ 7 < 2 mm (X, Y).
-* Tool khi chạy chương trình: chưa xác nhận – `syntax/real_tool_probe.txt`.
+* `syntax/real_tool_probe.txt` trên robot thật: Pick (đổi sang usrfr_thanh) lệch **Y < 5 mm, X > 100 mm** so với số
+  teach (tool_thanh) ⇒ lúc chạy chương trình **tool ≠ tool_thanh** (nhiều khả năng tool 0 = mặt bích).
+  Chuyển động không ảnh hưởng (cặp kine_forward + movl). Các ngưỡng tọa độ cố định (zone_monitor, vùng nguy hiểm
+  khi Home) đang so vị trí mặt bích với ngưỡng đo bằng tool_thanh → lệch khoảng chiều dài tool theo X.
+  Đề xuất: đo lại X DoorC1, X DoorC2, Y Pick với **tool 0** trên màn hình Manual (giữ usrfr_thanh) để cập nhật ngưỡng.
