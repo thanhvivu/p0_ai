@@ -26,6 +26,14 @@ T26={75:('p_pick_true_axis = [-62.562,148.695,10.785,199.567,-197.644,-45.829]',
      131:('p_unload_m2 = [57.266,126.106,64.997,170.375,-256.483,-135.334]','p_unload_m2 = [57.882,126.213,64.715,170.554,-255.866,-135.318]')}
 for n,(o,nw) in T26.items():
     assert L[n-1].strip()==o,(n,L[n-1]); L[n-1]=nw
+HOME26={79:('p_home_location = [-43.100,56.711,106.885,194.140,-264.961,48.660]','p_home_location = [-45.000,56.711,106.885,194.140,-264.961,-45.000]'),
+     83:('p_process6_safe = [-43.100,56.711,106.885,194.140,-264.961,48.660]','p_process6_safe = [-45.000,56.711,106.885,194.140,-264.961,-45.000]'),
+     190:('p_home_location_min = [-48.100,51.711,101.885,189.140,-269.961,43.660]','p_home_location_min = [-50.000,51.711,101.885,189.140,-269.961,-50.000]'),
+     191:('p_home_location_max = [-38.100,61.711,111.885,199.140,-259.961,53.660]','p_home_location_max = [-40.000,61.711,111.885,199.140,-259.961,-40.000]')}
+for n,(o,nw) in HOME26.items():
+    assert L[n-1].strip()==o,(n,L[n-1]); L[n-1]=nw
+assert L[77].startswith('# HomeLocation')
+L[77] = L[77] + ' - [CNC36] re-taught 2026-11-26 (J1 -45, J6 -45)'
 assert L[115].startswith('# C1UnloadDown')
 L[115] = '# C1UnloadDown - [CNC36] 2026-11-26: set EQUAL to C1Unload (no separate down move; MoveL of 0 mm)'
 assert L[143].startswith('# Process 8 Case 1 - Change Tool'), L[143]

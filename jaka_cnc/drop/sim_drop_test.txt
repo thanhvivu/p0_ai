@@ -87,12 +87,12 @@ p_c6_user_x_offset = [0.0,0,0.0,0,0,0]
 p_pick_true_axis = [-62.955,153.356,0.661,205.147,-198.542,-47.273]
 # pick - taught joint point from CobotStudio
 p_pick = [-62.988,145.634,22.030,191.501,-198.575,-47.272]
-# HomeLocation - copied from CobotStudio Position Variable
-p_home_location = [-43.100,56.711,106.885,194.140,-264.961,48.660]
+# HomeLocation - copied from CobotStudio Position Variable - [CNC36] re-taught 2026-11-26 (J1 -45, J6 -45)
+p_home_location = [-45.000,56.711,106.885,194.140,-264.961,-45.000]
 
 # Process6Safe TEMP - replace with the taught Process6Safe joint point later
 # Temporarily uses HomeLocation to avoid using an arbitrary unverified robot pose
-p_process6_safe = [-43.100,56.711,106.885,194.140,-264.961,48.660]
+p_process6_safe = [-45.000,56.711,106.885,194.140,-264.961,-45.000]
 # Process6Put1 = taught point bavia
 p_process6_put1 = [-19.220,129.251,53.818,176.378,-244.126,-226.929]
 # Process6Put1Safe = taught point bavia_wait
@@ -374,8 +374,8 @@ p_door_c1_min = [-131.687,78.807,107.098,158.645,-266.426,-49.917]
 p_door_c1_max = [-121.687,88.807,117.098,168.645,-256.426,-39.917]
 p_door_c2_min = [77.806,62.797,123.293,160.476,-235.174,-54.001]
 p_door_c2_max = [87.806,72.797,133.293,170.476,-225.174,-44.001]
-p_home_location_min = [-48.100,51.711,101.885,189.140,-269.961,43.660]
-p_home_location_max = [-38.100,61.711,111.885,199.140,-259.961,53.660]
+p_home_location_min = [-50.000,51.711,101.885,189.140,-269.961,-50.000]
+p_home_location_max = [-40.000,61.711,111.885,199.140,-259.961,-40.000]
 
 
 log_message(1,"SIM DROP TEST START")

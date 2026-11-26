@@ -412,7 +412,8 @@ Chuẩn bị: giữ `jamaguchi_cnc36.txt` trên bộ điều khiển (tên khác
 * Không dùng `set_tool_id` trong code: điểm theo góc khớp + cặp kine_forward/movl ⇒ về đúng tư thế với mọi TCP;
   mọi đoạn MoveL đã kiểm (từ tọa độ Descartes) là tịnh tiến thuần (xoay ≤ 0,37°) ⇒ quỹ đạo như nhau với mọi TCP.
 * Cập nhật: pickwait, pick, C1Unload/Wait (**Down = Unload**, MoveL 0 mm), c1load/wait/end, unload_daotool,
-  load_daotool/wait (Load_vuong, xuống 62,4 mm), c2_unload/wait. Giữ: Door, Air C1/C2, TG, Home (bản teach mới
-  Home_J = [-45,56.711,106.885,194.140,-264.961,-45] chưa áp dụng – J6 xoay 93,7°).
+  load_daotool/wait (Load_vuong, xuống 62,4 mm), c2_unload/wait. Giữ: Door, Air C1/C2, TG.
+* **Home** (cập nhật sau, PLC dùng Home mới): `p_home_location` = `p_process6_safe` = [-45,56.711,106.885,194.140,-264.961,-45];
+  mọi lệnh về Home và nhận diện Home đều đọc biến này. Không còn giá trị Home cũ trong code.
 * P8: unload_daotool xuống, lùi lên unload_daotool_wait, lùi lên load_daotool_wait → **MoveL** (trước là MoveJ).
   Vùng nhận diện Home của 2 đoạn đảo tool tính lại (±5°).
