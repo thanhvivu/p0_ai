@@ -1,73 +1,74 @@
 # PROGRESS – JAKA cobot nạp phôi 6 máy CNC (cập nhật 2026-11-26)
 
-Chi tiết kỹ thuật, kết quả test, checklist: `jaka_cnc/PHAN_TICH.md` (mục 1–24).
+Chi tiết kỹ thuật, kết quả test, checklist: `jaka_cnc/PHAN_TICH.md` (mục 1–25).
 Branch: `claude/robot-cnc-code-analysis-ji9l5h`.
 
-## Mục tiêu tổng thể
-- Robot JAKA trên trục Axis1 phục vụ 6 CNC (2 hàng: lẻ 1/3/5 = công đoạn 1, chẵn 2/4/6 = công đoạn 2).
-- Mở rộng chương trình script cũ (chạy CNC1/2) sang CNC3..6, giữ nguyên logic đã chạy ở nhà máy.
-- Phụ: chương trình riêng "CNC1 + thả hàng ra ngoài"; bit cảnh báo vùng làm việc cho PLC; rút gọn code.
+## Mục tiêu
+- Robot JAKA (A5, A510003020) trên trục Axis1 phục vụ 6 CNC: lẻ 1/3/5 = công đoạn 1, chẵn 2/4/6 = công đoạn 2.
+- Mở rộng script cũ (CNC1/2) sang CNC3..6, giữ logic đã chạy ở nhà máy. Phụ: chương trình "CNC1 + thả hàng",
+  bit vùng làm việc cho PLC, rút gọn code.
 
-## File chính (`jaka_cnc/`)
-- `jamaguchi_goc.txt`: code gốc. `jamaguchi_cnc36.txt`: bản đang chạy (CNC1..6, đánh dấu `[CNC36]`).
-- `tools/build_cnc36.py`: dựng `cnc36` từ code gốc (`tr -d '\r' < jamaguchi_goc.txt > orig.txt; python build_cnc36.py orig.txt jamaguchi_cnc36.txt`). **Sửa cnc36 qua script này**, không sửa tay.
-- `sim/tao_sim.py` → `sim_test1_motion` (Case CNC), `sim_test2_home` (24 phép thử DI90), `sim_test3_p8`.
-- `drop/tao_drop.py` → `jamaguchi_cnc1_drop.txt` + `sim_drop_test`, `sim_drop_home_test`.
-- `zone/tao_zone.py` → `zone_monitor.txt` (Sub-thread), `sim_zone_monitor`, `sim_zone_test`; `sim_main_simple.txt`.
-- `syntax/`: các test cú pháp, `real_frame_probe.txt`, `real_tool_probe.txt` (chạy được trên máy thật).
+## Kiến trúc
+**Chương trình chính `jaka_cnc/jamaguchi_cnc36.txt`** (một script, không có hàm; `while(1)` quét 0,1 s):
+- Header: khai báo điểm (góc khớp), cờ, reset DO. Vòng quét: AI3 → tốc độ; DI16 thoát Process; DI90 Home;
+  chọn Process DI18..27 (P1..P10); trong Process: DI17 trả Case, chọn Case, thực thi Case, DO Case Comp.
+- CNC: P2/P3/P4 dùng chung 4 Case (29 Load lẻ, 30 Unload lẻ, 31 Load chẵn, 32 Unload chẵn) với bộ điểm active
+  `p_odd_*`/`p_even_*` chọn theo `cnc_pair` (P2→1, P3→2, P4→3; DI90 theo AI16 = số CNC 1..6).
+- Home DI90: nhận diện điểm (TCP ±20 mm + khớp ±5° tính từ điểm), đoạn P7/P8 (mảng min/max), vùng nguy hiểm
+  (công thức Base→usrfr_thanh) → MoveL về Load/Unload/Air Wait → cửa; dự phòng AI16 → hướng gần nhất → MoveJ Home.
+  `home_route_door_done` = đã tới điểm an toàn (không phải đã ở Home); bước cuối luôn MoveJ `p_home_location`.
+- Chuyển động: MoveL = `kine_forward(joint)` + `movl` (về đúng góc khớp với mọi tool/user frame);
+  MoveJ tới điểm có offset = `kine_forward` + `pose_add` + `kine_inverse(ref, pose)` + `movj`.
+**Công cụ sinh file (sửa ở đây, không sửa tay):**
+- `tools/build_cnc36.py` (code gốc `jamaguchi_goc.txt` → cnc36): `tr -d '\r' < jamaguchi_goc.txt > orig.txt;
+  python build_cnc36.py orig.txt jamaguchi_cnc36.txt`. Mọi điểm mới thêm vào đây (dict theo số dòng code gốc).
+- `drop/tao_drop.py` → `jamaguchi_cnc1_drop.txt` (+ sim). `zone/tao_zone.py` → `zone_monitor.txt` (+ sim).
+- `sim/tao_sim.py` → test Simulation 1/2/3. `syntax/`: test cú pháp, `real_frame_probe`, `real_tool_probe` (máy thật).
+**Chạy song song:** khung kéo thả `New Program` = Run Program Sub-thread1 → `check_workzone` (zone_monitor), rồi Sub chính.
 
-## Đã hoàn thành
-- cnc36: bộ điểm active `p_odd_*`/`p_even_*` theo `cnc_pair` (P2→1, P3→2, P4→3; Home theo AI16); cửa theo cặp;
-  Home ±5° tính từ điểm; vùng nguy hiểm → MoveL về Load/Unload/Air Wait → cửa (cả lẻ & chẵn).
-- Máy thật OK: chu trình CNC1/2; Home qua Wait; P8 đảo tool (điểm mới + MoveL xuống Load_daotool).
-- Điểm CNC1/CNC2 Load cập nhật lần teach 2026-11-17 (lần 2). CNC3..6 + cửa = PLACEHOLDER (chép CNC1/CNC2).
-- Simulation đạt: Test 1, Test 2 (18/18 cũ), Test 3, sim_drop_test, sim_drop_home_test, test song song zone.
-- Drop program: P7 Case DI53 = Home → trên cao (+100 Z) → MoveL xuống → DO65/DI65 → nhấc → Home; Home nhận
-  diện đoạn điểm thả bằng vòng `while` 6 khớp. Điểm thả teach: `[-9.049,127.295,101.570,128.230,-234.974,129.924]`.
-- zone_monitor (DO56 lẻ, DO57 chẵn, DO58 Pick), đã rút gọn (57 dòng), chạy dạng Sub-thread1 trong khung kéo thả.
-
-- 2026-11-26: bộ điểm mới + Tool Load tròn/vuông (PHAN_TICH mục 25) đã đưa vào cnc36 qua `tools/build_cnc36.py`;
-  P8 3 đoạn thẳng → MoveL; sinh lại sim/drop/zone. **Chưa test** (Simulation + máy thật).
+## Trạng thái điểm (2026-11-26)
+- Tool Load có 2 đầu: **tròn** (Load_Tron) cho Pick + CNC1/3/5; **vuông** (Load_vuong) cho CNC2/4/6 sau P8 đảo tool.
+  Chung xi lanh DO60/DO61. TCP chỉ khác 6 mm theo Z tool → không dùng `set_tool_id` trong code.
+- Đã cập nhật: pick/pickwait, C1Unload/Wait (**Down = Unload**), c1load/wait/end (tròn), CNC2 Load = bộ vuông,
+  c2_unload/wait, unload_daotool, load_daotool/wait (vuông), **Home mới** [-45,56.711,106.885,194.140,-264.961,-45]
+  (cả `p_process6_safe`). Giữ: Door, Air C1/C2, TG. Dự phòng: `p_c2_tron_load_*` (CNC2 đầu tròn, chọn model sau).
+- P8: unload_daotool xuống/lên và load_daotool xuống/lên đều MoveL.
+- CNC3..6 + cửa = PLACEHOLDER (chép CNC1 tròn / CNC2 vuông). Điểm thả (drop) `[-9.049,127.295,101.570,128.230,-234.974,129.924]`.
 
 ## Đang làm dở
-- **Ưu tiên 1: chạy thật chương trình thả hàng** theo checklist `PHAN_TICH.md` mục 22 (chưa có kết quả).
-- zone_monitor: ngưỡng đang đo bằng tool_thanh nhưng chương trình chạy với tool khác (xem dưới) → chờ số đo lại.
-- Test 2 bản 24 phép thử (19–24: vùng nguy hiểm qua Wait) chưa chạy lại trong Simulation (máy thật đã OK).
+- **Test máy thật bản 2026-11-26** (AI3 ≤ 20): P1 Pick (đầu tròn), Unload/Load CNC1, P8 (3 đoạn MoveL mới),
+  Load CNC2 đầu vuông, Unload CNC2, DI90 giữa đoạn P8 và tại C1Unload, các MoveJ với Home mới (J6 xoay 93,7°).
+- Chạy thật drop program (`PHAN_TICH.md` mục 22).
+- zone_monitor: ngưỡng đo bằng tool_thanh nhưng chương trình chạy tool khác → chờ đo lại với tool 0.
 
 ## Quyết định đã chốt (lý do)
-- **Chỉ tạo file test Simulation khi người dùng yêu cầu** (2026-11-26); hiện test trực tiếp trên robot thật.
-- Teach điểm bằng góc khớp; MoveL luôn qua cặp `kine_forward` + `movl` (đúng với mọi tool/user frame).
-- Thả hàng = file riêng, P7 làm trigger (không đụng bản cnc36 đang chạy).
-- Chưa rút gọn `jamaguchi_cnc36.txt` (đang chạy ổn; ưu tiên drop test). Ước giảm được ~400–500 dòng.
-- zone_monitor chạy Sub-thread (khung kéo thả: Run Program Sub-thread1 → check_workzone, rồi Sub chính),
-  không đặt `set_user_frame_id`/`set_tool_id` (thiết lập chung toàn robot).
-- DO56 vẫn bật ở Pick nếu X vượt ngưỡng (PLC tự xử lý); đệm cửa `zone_door_margin = 20` mm.
-- Tín hiệu kẹp chuck DO79/DI79 (lẻ), DO78/DI78 (chẵn) dùng chung; PLC chọn máy theo Process. AI16 = số CNC 1..6.
-- P5 (xì khí), P6 (Bavia) đang bỏ qua phía PLC; code giữ nguyên.
+- **Chỉ tạo file test Simulation khi người dùng yêu cầu**; hiện test trực tiếp robot thật.
+- Hỏi người dùng tài liệu khi chưa chắc cú pháp/lệnh (không đoán); www.jaka.com không truy cập được từ cloud.
+- Teach bằng góc khớp; không đổi tool/user frame trong code (thiết lập chung toàn robot, ảnh hưởng zone_monitor).
+- Thả hàng = file riêng, P7 (DI24/DI53) làm trigger; Home+100 Z bằng `pose_add`, có kiểm tra 99–101 mm.
+- Chưa rút gọn cnc36 (đang chạy ổn); ước giảm ~400–500 dòng khi được đồng ý.
+- zone_monitor: DO56 X_user > 679.362+20, DO57 X_user < −365.358−20, DO58 Y_user > 1187.165; đổi trạng thái mới ghi DO + log.
+- Kẹp chuck DO79/DI79 (lẻ), DO78/DI78 (chẵn) dùng chung, PLC chọn máy theo Process. P5/P6 đang bỏ qua (PLC).
 
-## Cú pháp JAKA đã kiểm chứng (bộ điều khiển này)
-- Dùng được: `&&`, `||`, `!=`, `if/elif/else/end`, `while`, chỉ số mảng là biến, gán `b[i] = a[i]`,
-  **phép tính khi gán phải bọc ngoặc**: `j = (j + 1)`, `xu = (0.7057 * (t[0] - 345.833) + ...)`.
-- Không dùng được: `!`; phép tính khi gán không bọc ngoặc; dấu `( )` trong chuỗi log; mảng viết trực tiếp
-  làm tham số hàm `pose_add(p,[0,0,50,0,0,0])`; gán `di64 = 1` cho biến đã dùng với `get_digital_input`;
-  hàm tự định nghĩa (bản phần mềm không có).
-- JAKA chỉ báo lỗi cú pháp khi **chạy tới dòng đó** → phải chạy thật qua từng nhánh (dùng file sim).
-- `pose_add`: cộng XYZ trực tiếp, giữ hướng. `movl` rel_flag 0/1 (user frame)/2 (tool).
+## Cú pháp JAKA đã kiểm chứng
+- Được: `&&`, `||`, `!=`, `if/elif/else/end`, `while`, chỉ số mảng là biến, `b[i] = a[i]`, gán nguyên mảng,
+  **phép tính khi gán phải bọc ngoặc** `j = (j + 1)`. Không được: `!`, tính toán khi gán không ngoặc,
+  `( )` trong chuỗi log, mảng viết trực tiếp làm tham số hàm, `di64 = 1` cho biến đọc DI, hàm tự định nghĩa.
+- Lỗi cú pháp chỉ báo khi chạy tới dòng đó. `pose_add`: cộng XYZ, giữ hướng. `movl` rel_flag 0 / 1 user / 2 tool.
 
-## Vấn đề còn tồn tại / đã thử không được
-- **Lúc chạy chương trình: user frame = 0 (base)** (probe máy thật), dù màn hình Manual hiện usrfr_thanh →
-  công thức Base→usrfr_thanh của code gốc là ĐÚNG. (Từng kết luận sai "đổi hệ hai lần" – đã hủy.)
-- **Tool lúc chạy ≠ tool_thanh** (probe: Pick lệch X > 100 mm, Y < 5 mm; có thể là tool 0). Ảnh hưởng
-  ngưỡng zone_monitor và vùng nguy hiểm Home; KHÔNG ảnh hưởng chuyển động hay drop program.
-- Simulation model Zu5 khác robot thật (A5 – A510003020) → không dùng mô phỏng để kiểm ngưỡng tọa độ.
+## Bug / rủi ro đã biết
+- Lúc chạy chương trình user frame = 0 (probe) → công thức Base→usrfr_thanh đúng (kết luận "đổi hệ hai lần" đã hủy).
+- **Tool lúc chạy ≠ tool_thanh** (probe: Pick lệch X > 100 mm) → ngưỡng zone_monitor và vùng nguy hiểm Home
+  lệch khoảng chiều dài tool theo X. Không ảnh hưởng chuyển động/drop.
+- **MoveL 0 mm** (C1Unload → C1UnloadDown) chưa chạy lần nào: nếu báo lỗi → bỏ lệnh đó trong Case 30.
 - Home chưa nhận diện P1 Pick/PickWait (DI90 ở Pick → MoveJ sang cửa CNC qua nhánh AI16).
-- Không đọc được www.jaka.com từ môi trường cloud → tài liệu lệnh do người dùng chụp gửi.
+- Mảng `*_min/*_max` cũ (CNC1/2, cửa) còn khai báo nhưng không dùng; chỉ `p_load/unload_daotool_segment_*`,
+  `p_process7_unload_segment_*` còn dùng (phải tính lại khi teach lại các điểm đó).
+- Simulation (Zu5) khác robot thật → không dùng để kiểm ngưỡng tọa độ.
 
 ## Bước tiếp theo
-1. Test bản 2026-11-26: Simulation Test 1/2/3 → máy thật P1, P2 (CNC1 tròn, CNC2 vuông), P8 ở tốc độ thấp.
-1b. Chạy thật drop program (`PHAN_TICH.md` mục 22), gửi log.
-2. Đo với tool 0 + usrfr_thanh: X DoorC1, X DoorC2, Y Pick → cập nhật ngưỡng `zone/tao_zone.py`
-   (hoặc chọn đặt `set_tool_id(1)` đầu chương trình – phải test lại toàn chu trình).
-3. PLC map DO56–DO58; chạy zone_monitor thật.
-4. Teach CNC3..6 (máy lẻ 9 điểm, chẵn 7 điểm + cửa) → sửa `tools/build_cnc36.py` → sinh lại sim → test → P3/P4 thật.
-5. (Khi được đồng ý) rút gọn cnc36 bằng cú pháp đã kiểm chứng; thêm nhận diện Pick cho Home.
+1. Test máy thật bản 2026-11-26 (mục "Đang làm dở"), gửi log nếu lỗi.
+2. Chạy thật drop program.
+3. Đo X DoorC1, X DoorC2, Y Pick với tool 0 + usrfr_thanh → cập nhật `zone/tao_zone.py`; PLC map DO56–58.
+4. Teach CNC3..6 (lẻ 9 điểm + cửa, chẵn 7 điểm + cửa) → `tools/build_cnc36.py` → test P3/P4.
+5. Khi được đồng ý: rút gọn cnc36; thêm nhận diện Pick cho Home.
