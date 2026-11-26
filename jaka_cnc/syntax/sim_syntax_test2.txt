@@ -1,0 +1,54 @@
+# !!! SIMULATION ONLY - no motion !!! Syntax test 2: logical operators and arithmetic in assignments.
+# Each step logs "Sn ..." BEFORE it runs; the controller stops at the first unsupported line,
+# S5-S9 removed: arithmetic in assignments is rejected by this controller - see sim_syntax_test3.txt
+# so the last Sn line shows which construct failed. "PASS" lines prove the value is correct.
+log_message(1,"S0 START")
+x = 3.0
+y = 5.0
+log_message(1,"S1 AND")
+if(x > 1.0 && y > 4.0):
+    log_message(1,"S1 PASS AND")
+end
+log_message(1,"S2 OR")
+if(x > 10.0 || y > 4.0):
+    log_message(1,"S2 PASS OR")
+end
+log_message(1,"S4 NOT EQUAL")
+if(x != y):
+    log_message(1,"S4 PASS NOT EQUAL")
+end
+log_message(1,"S10 MIXED AND OR WITH PARENTHESES")
+if((x > 1.0 && y > 100.0) || (x < 10.0 && y < 10.0)):
+    log_message(1,"S10 PASS MIXED")
+end
+log_message(1,"S11 IF ELIF ELSE - ELIF BRANCH")
+k = 2
+if(k == 1):
+    log_message(1,"S11 FAIL IF BRANCH")
+elif(k == 2):
+    log_message(1,"S11 PASS ELIF BRANCH")
+else:
+    log_message(1,"S11 FAIL ELSE BRANCH")
+end
+log_message(1,"S12 IF ELIF ELIF ELSE - ELSE BRANCH")
+if(k == 5):
+    log_message(1,"S12 FAIL IF")
+elif(k == 6):
+    log_message(1,"S12 FAIL ELIF 1")
+elif(k == 7):
+    log_message(1,"S12 FAIL ELIF 2")
+else:
+    log_message(1,"S12 PASS ELSE BRANCH")
+end
+log_message(1,"S13 ELIF WITH AND")
+if(k == 1 && x > 1.0):
+    log_message(1,"S13 FAIL")
+elif(k == 2 && x > 1.0):
+    log_message(1,"S13 PASS ELIF AND")
+end
+log_message(1,"S14 NOT ON INTEGER VARIABLE - LAST ON PURPOSE")
+f = 0
+if(!f):
+    log_message(1,"S14 PASS NOT INTEGER")
+end
+log_message(1,"SYNTAX TEST 2 END")

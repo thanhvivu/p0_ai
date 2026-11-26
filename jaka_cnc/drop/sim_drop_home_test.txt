@@ -1,0 +1,2456 @@
+# !!! SIMULATION ONLY !!! Generated from jamaguchi_cnc1_drop.txt; DO writes and DI waits removed.
+
+# [CNC36] 2026-11: extended for CNC3..CNC6 (P3 = CNC3/CNC4, P4 = CNC5/CNC6).
+#   Search "[CNC36]" for every change. Motion code is shared; only the point set changes.
+#   CNC3..CNC6 points (incl. Door) are PLACEHOLDER copies of CNC1/CNC2 and must be re-taught.
+#   Home keep-J6 Door moves read J1..J5 from p_odd_door/p_even_door (verify on first load).
+#
+# FULL PROCESS 1-10 - EMBEDDED IO MODBUS
+# Source: MapRobotCobot.xlsx (Desktop, 2026-09-04)
+# Input logic: active HIGH
+# JAKA Modbus namespace: type 4
+# Address rule: DI_n or DO_n uses zero-based index n-1
+#
+# Common:
+# DI16 idx15 = Process Exit Request
+# DI17 idx16 = Complete Return / leave current Case
+# DI90 idx89 = Home Process Request / MoveHomePosition
+# AI16 idx15 = CNC number used as the fallback Home door selector
+# DO16 idx15 = Robot Home
+# DO17 idx16 = Process Exit Complete
+#
+# Process conditions and interlocks:
+# DI18..DI27 idx17..26 = P1..P10 Condition
+# DO18..DO27 idx17..26 = P1..P10 Interlock
+#
+# Implemented Case pairs from the new map:
+# P1: DI28/DO28
+# P2: DI30..DI33 / DO30..DO33
+# P3: DI35..DI38 / DO35..DO38
+# P4: DI40..DI43 / DO40..DO43
+# P5: DI45..DI46 / DO45..DO46
+# P6: DI48..DI51 / DO48..DO51
+# P7: DI53/DO53
+# P8: DI55/DO55 used for Case 1 Change Tool
+# P9/P10: no Case mapped
+
+active_process = 0
+door_select = -1
+last_door_select = 0
+process_idx = 0
+active_case = 0
+last_completed_case = 0
+case_completed = 0
+exit_latched = 0
+home_latched = 0
+at_c1_load_wait = 0
+at_c1_load = 0
+at_c1_load_end = 0
+at_c1_unload_wait = 0
+at_c1_unload = 0
+at_load_m2_wait = 0
+at_load_m2 = 0
+at_end_load_m2 = 0
+at_unload_m2_wait = 0
+at_unload_m2 = 0
+at_air_c2 = 0
+home_route_door_done = 0
+home_route_hint = 0
+home_already_home = 0
+startup_scan = 1
+
+# AI_3 Modbus (index 2) controls normal motion speed.
+# Use literal stepped values because this controller rejects arithmetic
+# expressions in some variable-assignment commands.
+# All MoveL motions use 30 mm/s.
+# before chuck clamp. Cylinder handshakes DO62/DI62 and DO63/DI63 are unused.
+ai3_speed_raw = 0
+speed_movej = 40
+speed_movel = 30
+# Faster profile for doors, intermediate points, wait points and free-space travel.
+# Fast MoveJ uses acceleration 720. Fast MoveL uses acceleration 3500.
+# Precision/action motions stay at 200.
+speed_movej_fast = 55
+speed_movel_fast = 30
+# CNC1 load positions: +0.1 mm along the active User-frame X axis.
+p_c1_user_x_offset = [-0.2,0,0.2,0,0,0]
+# CNC2 load positions: edit the first value to change the User-frame X offset.
+p_c2_user_x_offset = [0.0,0,0.0,0,0,0]
+# [CNC36] CNC3..CNC6 fine offsets in the active User frame (same meaning as CNC1/CNC2).
+p_c3_user_x_offset = [0.0,0,0.0,0,0,0]
+p_c4_user_x_offset = [0.0,0,0.0,0,0,0]
+p_c5_user_x_offset = [0.0,0,0.0,0,0,0]
+p_c6_user_x_offset = [0.0,0,0.0,0,0,0]
+
+# ===== TAUGHT JOINT POINTS =====
+# pickwwait - taught joint point from CobotStudio
+p_pick_true_axis = [-62.955,153.356,0.661,205.147,-198.542,-47.273]
+# pick - taught joint point from CobotStudio
+p_pick = [-62.988,145.634,22.030,191.501,-198.575,-47.272]
+# HomeLocation - copied from CobotStudio Position Variable - [CNC36] re-taught 2026-11-26 (J1 -45, J6 -45)
+p_home_location = [-45.000,56.711,106.885,194.140,-264.961,-45.000]
+
+# Process6Safe TEMP - replace with the taught Process6Safe joint point later
+# Temporarily uses HomeLocation to avoid using an arbitrary unverified robot pose
+p_process6_safe = [-45.000,56.711,106.885,194.140,-264.961,-45.000]
+# Process6Put1 = taught point bavia
+p_process6_put1 = [-19.220,129.251,53.818,176.378,-244.126,-226.929]
+# Process6Put1Safe = taught point bavia_wait
+p_process6_put1_safe = [-19.260,129.153,49.955,180.339,-244.165,-226.929]
+
+# Process 2 Case 1 - Load CNC1
+p_door_c1 = [-126.687,83.807,112.098,163.645,-261.426,-44.917]
+p_door_c2 = [82.806,67.797,128.293,165.476,-230.174,-49.001]
+# Only DI90 Home routes preserve current J6 when moving to a Door.
+# Normal Process entry and DI16 Process exit still use the fully taught Door joint point.
+# CNC1 danger-boundary TCP references; runtime Home logic uses their Y range and DoorC1 X.
+# P1 TCP = [679.362,755.117,268.781,85.426,-44.094,91.619]
+# P2 TCP = [679.362,496.706,265.455,87.738,-42.479,92.263]
+# CNC2 danger-boundary TCP references; runtime Home logic uses their Y range and DoorC2 X.
+# P1 TCP = [-365.358,568.492,319.504,79.654,-36.745,-87.583]
+# P2 TCP = [-365.358,321.336,337.328,86.882,-38.982,-93.748]
+p_air_switch_tool = [-134.333,142.075,36.696,180.755,-269.211,-44.855]
+
+# AirC1v1 - additional CNC1 air point.
+p_air_c1v1 = [-134.312, 136.943, 45.580, 177.004, -269.190, -44.856]
+
+p_air_c2 = [55.659,126.993,65.379,166.557,-258.042,-47.170]
+# AirC2v1 = taught joint point from CobotStudio screenshot
+p_air_c2v1 = [56.198,122.439,71.850,164.637,-257.503,-47.180]
+# Updated taught positions for CNC1 Load. - [CNC36] re-taught 2026-11-26 with TCP Load_Tron (round head)
+p_c1_load = [-133.226,140.148,39.140,181.366,-267.073,44.109]
+p_c1_load_wait = [-136.904,141.578,36.301,182.774,-270.750,44.067]
+p_c1_load_end = [-132.915,140.059,39.318,181.277,-266.762,44.112]
+
+# Process 2 Case 2 - Unload CNC1, J6 = original J6 + 180 degrees
+p_c1_unload_wait = [-138.024,143.229,32.752,184.947,-274.933,-136.083]
+p_c1_unload = [-134.015,140.941,37.268,182.715,-271.290,-136.023]
+# C1UnloadDown - [CNC36] 2026-11-26: set EQUAL to C1Unload (no separate down move; MoveL of 0 mm)
+p_c1_unload_down = [-134.015,140.941,37.268,182.715,-271.290,-136.023]
+
+# Process 2 Case 3 - Load CNC2 (model 2 taught positions) - [CNC36] 2026-11-26: LoadM2_Wait/LoadC2/EndLoadM2v1 = SQUARE head set (TCP Load_vuong)
+p_load_m2_wait = [51.875,125.469,65.840,169.996,-261.814,44.043]
+# LoadC2: release Tool Load before entering EndLoadM2v1
+p_load_c2 = [57.542,125.553,65.891,169.886,-256.149,44.176]
+# EndLoadM2v1 - updated from the latest taught position.
+p_end_load_m2v1 = [57.997,125.599,65.829,169.904,-255.694,44.187]
+p_end_load_m2v2 = [57.088,126.289,65.170,169.400,-256.938,44.672]
+# EndLoadM2v1/v2 are retained for Home recognition only while Case 3 is simplified.
+# Relative Cartesian retreat after loading even-numbered CNC: X -20 mm in user frame
+
+# Process 2 Case 4 - Unload CNC2, J6 = original J6 + 180 degrees
+p_unload_m2_wait = [51.577,126.387,64.435,170.628,-262.170,-135.482]
+p_unload_m2 = [57.882,126.213,64.715,170.554,-255.866,-135.318]
+
+# ===== [CNC36] SPARE: CNC2 load points for the ROUND head (TCP Load_Tron), taught 2026-11-26 =====
+# Not used now (CNC2 is loaded with the square head). Kept for a future product/model selection.
+p_c2_tron_load_wait = [51.981,126.155,66.601,166.126,-261.765,44.318]
+p_c2_tron_load = [57.453,126.223,66.572,166.066,-256.294,44.208]
+p_c2_tron_load_end = [57.814,126.257,66.520,166.082,-255.933,44.201]
+# ===== [CNC36] CNC3..CNC6 TAUGHT POINTS =====
+# The robot base rides on Axis1 (moved by PLC): Pos1 = CNC1/2, Pos2 = CNC3/4, Pos3 = CNC5/6.
+# Joint points are relative to the robot base. If Axis1 stops at exactly the same relative
+# position in front of every pair, the CNC1/CNC2 values could be reused unchanged.
+# !!! PLACEHOLDER: every value below is a COPY of CNC1 (odd side) or CNC2 (even side). !!!
+# !!! Re-teach / verify each point on the real machine before running at normal speed. !!!
+# Door points (robot posture in the aisle in front of each CNC pair) - PLACEHOLDER
+# DoorC3/DoorC5 copy DoorC1 (odd side), DoorC4/DoorC6 copy DoorC2 (even side).
+# copy of p_door_c1
+p_door_c3 = [-126.687,83.807,112.098,163.645,-261.426,-44.917]
+# copy of p_door_c2
+p_door_c4 = [82.806,67.797,128.293,165.476,-230.174,-49.001]
+# copy of p_door_c1
+p_door_c5 = [-126.687,83.807,112.098,163.645,-261.426,-44.917]
+# copy of p_door_c2
+p_door_c6 = [82.806,67.797,128.293,165.476,-230.174,-49.001]
+
+# CNC3 (P3 Case1/Case2, odd side like CNC1) - PLACEHOLDER
+# copy of p_air_c1v1
+p_c3_air_v1 = [-134.312, 136.943, 45.580, 177.004, -269.190, -44.856]
+# copy of p_air_switch_tool
+p_c3_air_switch_tool = [-134.333,142.075,36.696,180.755,-269.211,-44.855]
+# copy of p_c1_load_wait
+p_c3_load_wait = [-136.904,141.578,36.301,182.774,-270.750,44.067]
+# copy of p_c1_load
+p_c3_load = [-133.226,140.148,39.140,181.366,-267.073,44.109]
+# copy of p_c1_load_end
+p_c3_load_end = [-132.915,140.059,39.318,181.277,-266.762,44.112]
+# copy of p_c1_unload_wait
+p_c3_unload_wait = [-138.024,143.229,32.752,184.947,-274.933,-136.083]
+# copy of p_c1_unload
+p_c3_unload = [-134.015,140.941,37.268,182.715,-271.290,-136.023]
+# copy of p_c1_unload_down
+p_c3_unload_down = [-134.015,140.941,37.268,182.715,-271.290,-136.023]
+
+# CNC4 (P3 Case3/Case4, even side like CNC2) - PLACEHOLDER
+# copy of p_air_c2v1
+p_c4_air_v1 = [56.198,122.439,71.850,164.637,-257.503,-47.180]
+# copy of p_air_c2
+p_c4_air = [55.659,126.993,65.379,166.557,-258.042,-47.170]
+# copy of p_load_m2_wait
+p_c4_load_wait = [51.875,125.469,65.840,169.996,-261.814,44.043]
+# copy of p_load_c2
+p_c4_load = [57.542,125.553,65.891,169.886,-256.149,44.176]
+# copy of p_end_load_m2v1
+p_c4_load_end = [57.997,125.599,65.829,169.904,-255.694,44.187]
+# copy of p_unload_m2_wait
+p_c4_unload_wait = [51.577,126.387,64.435,170.628,-262.170,-135.482]
+# copy of p_unload_m2
+p_c4_unload = [57.882,126.213,64.715,170.554,-255.866,-135.318]
+
+# CNC5 (P4 Case1/Case2, odd side like CNC1) - PLACEHOLDER
+# copy of p_air_c1v1
+p_c5_air_v1 = [-134.312, 136.943, 45.580, 177.004, -269.190, -44.856]
+# copy of p_air_switch_tool
+p_c5_air_switch_tool = [-134.333,142.075,36.696,180.755,-269.211,-44.855]
+# copy of p_c1_load_wait
+p_c5_load_wait = [-136.904,141.578,36.301,182.774,-270.750,44.067]
+# copy of p_c1_load
+p_c5_load = [-133.226,140.148,39.140,181.366,-267.073,44.109]
+# copy of p_c1_load_end
+p_c5_load_end = [-132.915,140.059,39.318,181.277,-266.762,44.112]
+# copy of p_c1_unload_wait
+p_c5_unload_wait = [-138.024,143.229,32.752,184.947,-274.933,-136.083]
+# copy of p_c1_unload
+p_c5_unload = [-134.015,140.941,37.268,182.715,-271.290,-136.023]
+# copy of p_c1_unload_down
+p_c5_unload_down = [-134.015,140.941,37.268,182.715,-271.290,-136.023]
+
+# CNC6 (P4 Case3/Case4, even side like CNC2) - PLACEHOLDER
+# copy of p_air_c2v1
+p_c6_air_v1 = [56.198,122.439,71.850,164.637,-257.503,-47.180]
+# copy of p_air_c2
+p_c6_air = [55.659,126.993,65.379,166.557,-258.042,-47.170]
+# copy of p_load_m2_wait
+p_c6_load_wait = [51.875,125.469,65.840,169.996,-261.814,44.043]
+# copy of p_load_c2
+p_c6_load = [57.542,125.553,65.891,169.886,-256.149,44.176]
+# copy of p_end_load_m2v1
+p_c6_load_end = [57.997,125.599,65.829,169.904,-255.694,44.187]
+# copy of p_unload_m2_wait
+p_c6_unload_wait = [51.577,126.387,64.435,170.628,-262.170,-135.482]
+# copy of p_unload_m2
+p_c6_unload = [57.882,126.213,64.715,170.554,-255.866,-135.318]
+
+# ===== [CNC36] ACTIVE CNC POINT SET =====
+# Case motion (cnc_motion_case 29..32) and DI90 Home recovery use only p_odd_* / p_even_*.
+# They are reloaded from cnc_pair at every P2/P3/P4 Case and at every DI90 Home request.
+cnc_pair = 1
+cnc_pos_ai16 = 0
+cnc_pos_pair = 0
+cnc_pos_mismatch = 0
+# [CNC36] Load the active CNC point set (p_odd_* / p_even_*) from cnc_pair.
+if(cnc_pair == 1):
+    p_odd_door = p_door_c1
+    p_even_door = p_door_c2
+    p_odd_user_x_offset = p_c1_user_x_offset
+    p_odd_air_v1 = p_air_c1v1
+    p_odd_air_switch_tool = p_air_switch_tool
+    p_odd_load_wait = p_c1_load_wait
+    p_odd_load = p_c1_load
+    p_odd_load_end = p_c1_load_end
+    p_odd_unload_wait = p_c1_unload_wait
+    p_odd_unload = p_c1_unload
+    p_odd_unload_down = p_c1_unload_down
+    p_even_user_x_offset = p_c2_user_x_offset
+    p_even_air_v1 = p_air_c2v1
+    p_even_air = p_air_c2
+    p_even_load_wait = p_load_m2_wait
+    p_even_load = p_load_c2
+    p_even_load_end = p_end_load_m2v1
+    p_even_unload_wait = p_unload_m2_wait
+    p_even_unload = p_unload_m2
+end
+if(cnc_pair == 2):
+    p_odd_door = p_door_c3
+    p_even_door = p_door_c4
+    p_odd_user_x_offset = p_c3_user_x_offset
+    p_odd_air_v1 = p_c3_air_v1
+    p_odd_air_switch_tool = p_c3_air_switch_tool
+    p_odd_load_wait = p_c3_load_wait
+    p_odd_load = p_c3_load
+    p_odd_load_end = p_c3_load_end
+    p_odd_unload_wait = p_c3_unload_wait
+    p_odd_unload = p_c3_unload
+    p_odd_unload_down = p_c3_unload_down
+    p_even_user_x_offset = p_c4_user_x_offset
+    p_even_air_v1 = p_c4_air_v1
+    p_even_air = p_c4_air
+    p_even_load_wait = p_c4_load_wait
+    p_even_load = p_c4_load
+    p_even_load_end = p_c4_load_end
+    p_even_unload_wait = p_c4_unload_wait
+    p_even_unload = p_c4_unload
+end
+if(cnc_pair == 3):
+    p_odd_door = p_door_c5
+    p_even_door = p_door_c6
+    p_odd_user_x_offset = p_c5_user_x_offset
+    p_odd_air_v1 = p_c5_air_v1
+    p_odd_air_switch_tool = p_c5_air_switch_tool
+    p_odd_load_wait = p_c5_load_wait
+    p_odd_load = p_c5_load
+    p_odd_load_end = p_c5_load_end
+    p_odd_unload_wait = p_c5_unload_wait
+    p_odd_unload = p_c5_unload
+    p_odd_unload_down = p_c5_unload_down
+    p_even_user_x_offset = p_c6_user_x_offset
+    p_even_air_v1 = p_c6_air_v1
+    p_even_air = p_c6_air
+    p_even_load_wait = p_c6_load_wait
+    p_even_load = p_c6_load
+    p_even_load_end = p_c6_load_end
+    p_even_unload_wait = p_c6_unload_wait
+    p_even_unload = p_c6_unload
+end
+
+
+# Process 5 Case 1 - Put Down Clean Unit
+p_clean_position_wait = [93.491,37.630,-55.238,18.328,-133.815,135.255]
+p_clean_position = [93.726,34.536,-64.383,29.319,-133.809,135.219]
+
+# Process 7 Case 1 - Put Down Inspection Unit
+p_process7_unload_wait = [-11.733,120.850,92.117,148.195,-265.255,135.530]
+p_process7_unload = [-11.734,134.268,97.282,129.613,-265.256,135.530]
+# Joint envelope between Process7Unload and Process7UnloadWait, including +/-5 degrees.
+p_process7_unload_segment_min = [-16.734,115.850,87.117,124.613,-270.256,130.530]
+p_process7_unload_segment_max = [-6.733,139.268,102.282,153.195,-260.255,140.530]
+
+# ===== [DROP] P7 Case1 = drop the part unloaded from CNC1 at an outside point =====
+# Drop point taught 2026-11-18 (usrfr_thanh + tool_thanh): TCP X -112.925, Y 1317.358, Z 353.706,
+# RX -86.283, RY -48.285, RZ -2.003. Tool Unload holding the part at the release height.
+p_drop = [-9.049,127.295,101.570,128.230,-234.974,129.924]
+# Approach / lift height: +100 mm Z. pose_add adds XYZ directly (same frame as kine_forward) and
+# keeps the orientation (R_res = R_offset * R_pose, R_offset = identity), so this is straight up.
+p_drop_up_offset = [0.0,0.0,100.0,0.0,0.0,0.0]
+p_drop_pose = kine_forward(p_drop)
+p_drop_above_pose = pose_add(p_drop_pose,p_drop_up_offset)
+p_drop_above_joint = kine_inverse(p_drop,p_drop_above_pose)
+home_j = 0
+
+# Process 8 Case 1 - Change Tool - [CNC36] 2026-11-26: Load_daotool* taught with TCP Load_vuong (62.4 mm descent), unload_daotool re-taught
+p_load_daotool_wait = [-4.269,92.626,96.069,174.039,-139.051,-43.430]
+p_load_daotool = [-4.267,94.590,103.932,164.212,-139.049,-43.430]
+p_trunggian_unload = [-13.614,106.581,53.951,195.463,-148.333,-48.906]
+p_unload_daotool_wait = [-53.210,77.391,102.652,91.290,-89.672,-323.161]
+p_unload_daotool = [-53.447,77.544,108.268,85.268,-89.522,-323.481]
+# Joint envelopes for DI90 Home recognition along each tool-change segment.
+# Each envelope covers both endpoints plus the same +/-5 degree tolerance.
+p_load_daotool_segment_min = [-9.269,87.626,91.069,159.212,-144.051,-48.430]
+p_load_daotool_segment_max = [0.733,99.590,108.932,179.039,-134.049,-38.430]
+p_unload_daotool_segment_min = [-58.447,72.391,97.652,80.268,-94.672,-328.481]
+p_unload_daotool_segment_max = [-48.210,82.544,113.268,96.290,-84.522,-318.161]
+
+# Precomputed joint limits for Home route recognition.
+# These literal arrays avoid arithmetic assignments, which this controller rejects.
+# Each lower/upper pair is the taught joint point minus/plus 5 degrees.
+p_c1_load_end_min = [-137.529,135.563,31.564,181.063,-272.018,39.198]
+p_c1_load_end_max = [-127.529,145.563,41.564,191.063,-262.018,49.198]
+p_c1_load_min = [-137.923,135.700,31.303,181.186,-272.411,39.176]
+p_c1_load_max = [-127.923,145.700,41.303,191.186,-262.411,49.176]
+p_c1_load_wait_min = [-143.586,138.680,25.546,183.964,-278.065,38.861]
+p_c1_load_wait_max = [-133.586,148.680,35.546,193.964,-268.065,48.861]
+p_c1_unload_min = [-138.563,135.802,32.750,177.372,-275.839,-139.961]
+p_c1_unload_max = [-128.563,145.802,42.750,187.372,-265.839,-129.961]
+p_c1_unload_wait_min = [-143.163,137.907,28.696,179.325,-280.438,-140.035]
+p_c1_unload_wait_max = [-133.163,147.907,38.696,189.325,-270.438,-130.035]
+p_c1_unload_down_min = [-138.561,135.586,33.163,177.176,-275.837,-139.961]
+p_c1_unload_down_max = [-128.561,145.586,43.163,187.176,-265.837,-129.961]
+p_end_load_m2v2_min = [52.088,121.289,60.170,164.400,-261.938,39.672]
+p_end_load_m2v2_max = [62.088,131.289,70.170,174.400,-251.938,49.672]
+p_end_load_m2v1_min = [51.678,121.378,59.477,165.783,-263.123,39.833]
+p_end_load_m2v1_max = [61.678,131.378,69.477,175.783,-253.123,49.833]
+p_load_m2_wait_min = [45.293,121.775,58.817,166.018,-269.506,39.650]
+p_load_m2_wait_max = [55.293,131.775,68.817,176.018,-259.506,49.650]
+p_load_c2_min = [51.589,121.376,59.481,165.780,-263.211,39.831]
+p_load_c2_max = [61.589,131.376,69.481,175.780,-253.211,49.831]
+p_unload_m2_min = [52.266,121.106,59.997,165.375,-261.483,-140.334]
+p_unload_m2_max = [62.266,131.106,69.997,175.375,-251.483,-130.334]
+p_unload_m2_wait_min = [46.507,121.321,59.645,165.483,-267.240,-140.484]
+p_unload_m2_wait_max = [56.507,131.321,69.645,175.483,-257.240,-130.484]
+p_air_c2_min = [50.659,121.993,60.379,161.557,-263.042,-52.170]
+p_air_c2_max = [60.659,131.993,70.379,171.557,-253.042,-42.170]
+p_door_c1_min = [-131.687,78.807,107.098,158.645,-266.426,-49.917]
+p_door_c1_max = [-121.687,88.807,117.098,168.645,-256.426,-39.917]
+p_door_c2_min = [77.806,62.797,123.293,160.476,-235.174,-54.001]
+p_door_c2_max = [87.806,72.797,133.293,170.476,-225.174,-44.001]
+p_home_location_min = [-50.000,51.711,101.885,189.140,-269.961,-50.000]
+p_home_location_max = [-40.000,61.711,111.885,199.140,-259.961,-40.000]
+
+
+log_message(1,"SIM DROP HOME TEST START")
+sim_ai16 = 1
+# array literal as a function argument is rejected: declare it first
+sim_up50 = [0.0,0.0,50.0,0.0,0.0,0.0]
+sim_mid_pose = pose_add(p_drop_pose,sim_up50)
+movj(p_home_location,0,speed_movej_fast,720,0)
+movj(p_drop_above_joint,0,speed_movej_fast,720,0)
+movl(p_drop_pose,0,50,200,0)
+home_route_door_done = 0
+home_already_home = 0
+home_route_hint = 0
+log_message(1,"SIM DROP HOME 1 AT DROP POINT EXPECT IN DROP SEGMENT THEN MOVEL UP THEN HOME")
+home_actual_joint = get_atl_joint_pose()
+home_actual_tcp = get_atl_tcp_pose()
+# AI16 contains the CNC number. Odd CNCs use DoorC1; even CNCs use DoorC2.
+# Analog ranges tolerate +/-0.5 around the integer command.
+ai16_home_cnc = sim_ai16
+ai16_home_door = 0
+if(ai16_home_cnc >= 0.5):
+    if(ai16_home_cnc < 1.5):
+        ai16_home_door = 1
+    end
+end
+if(ai16_home_cnc >= 1.5):
+    if(ai16_home_cnc < 2.5):
+        ai16_home_door = 2
+    end
+end
+if(ai16_home_cnc >= 2.5):
+    if(ai16_home_cnc < 3.5):
+        ai16_home_door = 1
+    end
+end
+if(ai16_home_cnc >= 3.5):
+    if(ai16_home_cnc < 4.5):
+        ai16_home_door = 2
+    end
+end
+if(ai16_home_cnc >= 4.5):
+    if(ai16_home_cnc < 5.5):
+        ai16_home_door = 1
+    end
+end
+if(ai16_home_cnc >= 5.5):
+    if(ai16_home_cnc < 6.5):
+        ai16_home_door = 2
+    end
+end
+# [CNC36] Select the CNC point set for Home recognition from AI16.
+# AI16 1/2 -> CNC1/2 set, 3/4 -> CNC3/4 set, 5/6 -> CNC5/6 set.
+# If AI16 is outside 0.5..6.5, keep the set of the last executed Case.
+if(ai16_home_cnc >= 0.5):
+    if(ai16_home_cnc < 2.5):
+        cnc_pair = 1
+    end
+end
+if(ai16_home_cnc >= 2.5):
+    if(ai16_home_cnc < 4.5):
+        cnc_pair = 2
+    end
+end
+if(ai16_home_cnc >= 4.5):
+    if(ai16_home_cnc < 6.5):
+        cnc_pair = 3
+    end
+end
+# [CNC36] Load the active CNC point set (p_odd_* / p_even_*) from cnc_pair.
+if(cnc_pair == 1):
+    p_odd_door = p_door_c1
+    p_even_door = p_door_c2
+    p_odd_user_x_offset = p_c1_user_x_offset
+    p_odd_air_v1 = p_air_c1v1
+    p_odd_air_switch_tool = p_air_switch_tool
+    p_odd_load_wait = p_c1_load_wait
+    p_odd_load = p_c1_load
+    p_odd_load_end = p_c1_load_end
+    p_odd_unload_wait = p_c1_unload_wait
+    p_odd_unload = p_c1_unload
+    p_odd_unload_down = p_c1_unload_down
+    p_even_user_x_offset = p_c2_user_x_offset
+    p_even_air_v1 = p_air_c2v1
+    p_even_air = p_air_c2
+    p_even_load_wait = p_load_m2_wait
+    p_even_load = p_load_c2
+    p_even_load_end = p_end_load_m2v1
+    p_even_unload_wait = p_unload_m2_wait
+    p_even_unload = p_unload_m2
+    log_message(1,"ACTIVE POINT SET CNC1 CNC2")
+end
+if(cnc_pair == 2):
+    p_odd_door = p_door_c3
+    p_even_door = p_door_c4
+    p_odd_user_x_offset = p_c3_user_x_offset
+    p_odd_air_v1 = p_c3_air_v1
+    p_odd_air_switch_tool = p_c3_air_switch_tool
+    p_odd_load_wait = p_c3_load_wait
+    p_odd_load = p_c3_load
+    p_odd_load_end = p_c3_load_end
+    p_odd_unload_wait = p_c3_unload_wait
+    p_odd_unload = p_c3_unload
+    p_odd_unload_down = p_c3_unload_down
+    p_even_user_x_offset = p_c4_user_x_offset
+    p_even_air_v1 = p_c4_air_v1
+    p_even_air = p_c4_air
+    p_even_load_wait = p_c4_load_wait
+    p_even_load = p_c4_load
+    p_even_load_end = p_c4_load_end
+    p_even_unload_wait = p_c4_unload_wait
+    p_even_unload = p_c4_unload
+    log_message(1,"ACTIVE POINT SET CNC3 CNC4")
+end
+if(cnc_pair == 3):
+    p_odd_door = p_door_c5
+    p_even_door = p_door_c6
+    p_odd_user_x_offset = p_c5_user_x_offset
+    p_odd_air_v1 = p_c5_air_v1
+    p_odd_air_switch_tool = p_c5_air_switch_tool
+    p_odd_load_wait = p_c5_load_wait
+    p_odd_load = p_c5_load
+    p_odd_load_end = p_c5_load_end
+    p_odd_unload_wait = p_c5_unload_wait
+    p_odd_unload = p_c5_unload
+    p_odd_unload_down = p_c5_unload_down
+    p_even_user_x_offset = p_c6_user_x_offset
+    p_even_air_v1 = p_c6_air_v1
+    p_even_air = p_c6_air
+    p_even_load_wait = p_c6_load_wait
+    p_even_load = p_c6_load
+    p_even_load_end = p_c6_load_end
+    p_even_unload_wait = p_c6_unload_wait
+    p_even_unload = p_c6_unload
+    log_message(1,"ACTIVE POINT SET CNC5 CNC6")
+end
+home_match_code = 0
+home_best_joint_error = 999999.0
+home_c1_danger_side = 0
+home_c2_danger_side = 0
+
+# get_atl_tcp_pose() returns Base coordinates, while both danger
+# boundaries were taught in usrfr_thanh.  Convert Base XYZ to
+# usrfr_thanh inside each comparison.  Direct expressions are used
+# because this controller rejects arithmetic variable assignments.
+# usrfr_thanh = [345.833,-489.782,-136.233,-0.093,-0.065,45.114].
+# CNC1 straight X boundary: both P1/P2 use DoorC1 X = 679.362.
+# CNC1 danger Y range: 496.706 <= Y <= 755.117.
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) >= 496.706):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 755.117):
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 496.706):
+    if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) > 679.362):
+        home_c1_danger_side = 1
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 496.706):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 550.000):
+        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) > 679.362):
+            home_c1_danger_side = 1
+        end
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 550.000):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 600.000):
+        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) > 679.362):
+            home_c1_danger_side = 1
+        end
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 600.000):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 650.000):
+        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) > 679.362):
+            home_c1_danger_side = 1
+        end
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 650.000):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 700.000):
+        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) > 679.362):
+            home_c1_danger_side = 1
+        end
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 700.000):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 755.117):
+        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) > 679.362):
+            home_c1_danger_side = 1
+        end
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 755.117):
+    if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) > 679.362):
+        home_c1_danger_side = 1
+    end
+end
+    end
+end
+
+# CNC2 straight X boundary: both P1/P2 use DoorC2 X = -365.358.
+# The CNC2 working side has X smaller than the boundary line.
+# CNC2 danger Y range: 321.336 <= Y <= 568.492.
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) >= 321.336):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 568.492):
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 321.336):
+    if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) < -365.358):
+        home_c2_danger_side = 1
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 321.336):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 375.000):
+        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) < -365.358):
+            home_c2_danger_side = 1
+        end
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 375.000):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 425.000):
+        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) < -365.358):
+            home_c2_danger_side = 1
+        end
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 425.000):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 475.000):
+        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) < -365.358):
+            home_c2_danger_side = 1
+        end
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 475.000):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 525.000):
+        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) < -365.358):
+            home_c2_danger_side = 1
+        end
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 525.000):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 568.492):
+        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) < -365.358):
+            home_c2_danger_side = 1
+        end
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 568.492):
+    if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) < -365.358):
+        home_c2_danger_side = 1
+    end
+end
+    end
+end
+
+home_test_tcp = kine_forward(p_odd_load_end)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 1
+end
+home_test_tcp = kine_forward(p_odd_load)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 2
+end
+home_test_tcp = kine_forward(p_odd_load_wait)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 3
+end
+home_test_tcp = kine_forward(p_odd_unload)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 4
+end
+home_test_tcp = kine_forward(p_odd_unload_wait)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 5
+end
+home_test_tcp = kine_forward(p_odd_unload_down)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 16
+end
+home_test_tcp = kine_forward(p_end_load_m2v2)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 6
+end
+home_test_tcp = kine_forward(p_even_load_end)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 7
+end
+home_test_tcp = kine_forward(p_even_load_wait)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 8
+end
+home_test_tcp = kine_forward(p_even_unload)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 9
+end
+home_test_tcp = kine_forward(p_even_unload_wait)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 10
+end
+home_test_tcp = kine_forward(p_even_air)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 11
+end
+home_test_tcp = kine_forward(p_even_load)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 15
+end
+home_test_tcp = kine_forward(p_odd_door)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 12
+end
+home_test_tcp = kine_forward(p_even_door)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 13
+end
+home_test_tcp = kine_forward(p_home_location)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 14
+end
+
+home_match_joint = p_home_location
+if(home_match_code == 1):
+    home_match_joint = p_odd_load_end
+end
+if(home_match_code == 2):
+    home_match_joint = p_odd_load
+end
+if(home_match_code == 3):
+    home_match_joint = p_odd_load_wait
+end
+if(home_match_code == 4):
+    home_match_joint = p_odd_unload
+end
+if(home_match_code == 5):
+    home_match_joint = p_odd_unload_wait
+end
+if(home_match_code == 16):
+    home_match_joint = p_odd_unload_down
+end
+if(home_match_code == 6):
+    home_match_joint = p_end_load_m2v2
+end
+if(home_match_code == 7):
+    home_match_joint = p_even_load_end
+end
+if(home_match_code == 8):
+    home_match_joint = p_even_load_wait
+end
+if(home_match_code == 9):
+    home_match_joint = p_even_unload
+end
+if(home_match_code == 10):
+    home_match_joint = p_even_unload_wait
+end
+if(home_match_code == 11):
+    home_match_joint = p_even_air
+end
+if(home_match_code == 12):
+    home_match_joint = p_odd_door
+end
+if(home_match_code == 13):
+    home_match_joint = p_even_door
+end
+if(home_match_code == 15):
+    home_match_joint = p_even_load
+end
+
+home_match_tcp = kine_forward(home_match_joint)
+# Validate Cartesian position axis by axis. pose_dist also includes
+# orientation on this controller and caused valid taught points to
+# be rejected as UNKNOWN even when XYZ was within 20 mm.
+home_match_valid = 1
+if(home_actual_tcp[0] < home_match_tcp[0] - 20.0):
+    home_match_valid = 0
+end
+if(home_actual_tcp[0] > home_match_tcp[0] + 20.0):
+    home_match_valid = 0
+end
+if(home_actual_tcp[1] < home_match_tcp[1] - 20.0):
+    home_match_valid = 0
+end
+if(home_actual_tcp[1] > home_match_tcp[1] + 20.0):
+    home_match_valid = 0
+end
+if(home_actual_tcp[2] < home_match_tcp[2] - 20.0):
+    home_match_valid = 0
+end
+if(home_actual_tcp[2] > home_match_tcp[2] + 20.0):
+    home_match_valid = 0
+end
+# [CNC36] Joint tolerance +/-5 deg is computed from the matched taught point itself,
+# so re-taught points and CNC3..CNC6 points need no extra *_min/*_max literal arrays.
+# Arithmetic inside if() is already used by the TCP check above on this controller.
+if(home_actual_joint[0] < home_match_joint[0] - 5.0):
+    home_match_valid = 0
+end
+if(home_actual_joint[0] > home_match_joint[0] + 5.0):
+    home_match_valid = 0
+end
+if(home_actual_joint[1] < home_match_joint[1] - 5.0):
+    home_match_valid = 0
+end
+if(home_actual_joint[1] > home_match_joint[1] + 5.0):
+    home_match_valid = 0
+end
+if(home_actual_joint[2] < home_match_joint[2] - 5.0):
+    home_match_valid = 0
+end
+if(home_actual_joint[2] > home_match_joint[2] + 5.0):
+    home_match_valid = 0
+end
+if(home_actual_joint[3] < home_match_joint[3] - 5.0):
+    home_match_valid = 0
+end
+if(home_actual_joint[3] > home_match_joint[3] + 5.0):
+    home_match_valid = 0
+end
+if(home_actual_joint[4] < home_match_joint[4] - 5.0):
+    home_match_valid = 0
+end
+if(home_actual_joint[4] > home_match_joint[4] + 5.0):
+    home_match_valid = 0
+end
+if(home_actual_joint[5] < home_match_joint[5] - 5.0):
+    home_match_valid = 0
+end
+if(home_actual_joint[5] > home_match_joint[5] + 5.0):
+    home_match_valid = 0
+end
+
+# Override normal point matching when the robot is at or between
+# Load_daotool and Load_daotool_Wait.
+home_load_daotool_segment = 1
+if(home_actual_joint[0] < p_load_daotool_segment_min[0]):
+    home_load_daotool_segment = 0
+end
+if(home_actual_joint[0] > p_load_daotool_segment_max[0]):
+    home_load_daotool_segment = 0
+end
+if(home_actual_joint[1] < p_load_daotool_segment_min[1]):
+    home_load_daotool_segment = 0
+end
+if(home_actual_joint[1] > p_load_daotool_segment_max[1]):
+    home_load_daotool_segment = 0
+end
+if(home_actual_joint[2] < p_load_daotool_segment_min[2]):
+    home_load_daotool_segment = 0
+end
+if(home_actual_joint[2] > p_load_daotool_segment_max[2]):
+    home_load_daotool_segment = 0
+end
+if(home_actual_joint[3] < p_load_daotool_segment_min[3]):
+    home_load_daotool_segment = 0
+end
+if(home_actual_joint[3] > p_load_daotool_segment_max[3]):
+    home_load_daotool_segment = 0
+end
+if(home_actual_joint[4] < p_load_daotool_segment_min[4]):
+    home_load_daotool_segment = 0
+end
+if(home_actual_joint[4] > p_load_daotool_segment_max[4]):
+    home_load_daotool_segment = 0
+end
+if(home_actual_joint[5] < p_load_daotool_segment_min[5]):
+    home_load_daotool_segment = 0
+end
+if(home_actual_joint[5] > p_load_daotool_segment_max[5]):
+    home_load_daotool_segment = 0
+end
+
+# Same recognition for unload_daotool and unload_daotool_Wait.
+home_unload_daotool_segment = 1
+if(home_actual_joint[0] < p_unload_daotool_segment_min[0]):
+    home_unload_daotool_segment = 0
+end
+if(home_actual_joint[0] > p_unload_daotool_segment_max[0]):
+    home_unload_daotool_segment = 0
+end
+if(home_actual_joint[1] < p_unload_daotool_segment_min[1]):
+    home_unload_daotool_segment = 0
+end
+if(home_actual_joint[1] > p_unload_daotool_segment_max[1]):
+    home_unload_daotool_segment = 0
+end
+if(home_actual_joint[2] < p_unload_daotool_segment_min[2]):
+    home_unload_daotool_segment = 0
+end
+if(home_actual_joint[2] > p_unload_daotool_segment_max[2]):
+    home_unload_daotool_segment = 0
+end
+if(home_actual_joint[3] < p_unload_daotool_segment_min[3]):
+    home_unload_daotool_segment = 0
+end
+if(home_actual_joint[3] > p_unload_daotool_segment_max[3]):
+    home_unload_daotool_segment = 0
+end
+if(home_actual_joint[4] < p_unload_daotool_segment_min[4]):
+    home_unload_daotool_segment = 0
+end
+if(home_actual_joint[4] > p_unload_daotool_segment_max[4]):
+    home_unload_daotool_segment = 0
+end
+if(home_actual_joint[5] < p_unload_daotool_segment_min[5]):
+    home_unload_daotool_segment = 0
+end
+if(home_actual_joint[5] > p_unload_daotool_segment_max[5]):
+    home_unload_daotool_segment = 0
+end
+
+if(home_load_daotool_segment == 1):
+    home_match_code = 17
+    home_match_valid = 1
+end
+if(home_unload_daotool_segment == 1):
+    home_match_code = 18
+    home_match_valid = 1
+end
+
+# [DROP] Recognize any stopped position between the drop point and the point 100 mm above it:
+# a joint is outside when it is beyond BOTH endpoints by more than 5 degrees.
+home_process7_unload_segment = 1
+home_j = 0
+while(home_j < 6):
+    if(home_actual_joint[home_j] < p_drop[home_j] - 5.0 && home_actual_joint[home_j] < p_drop_above_joint[home_j] - 5.0):
+        home_process7_unload_segment = 0
+    end
+    if(home_actual_joint[home_j] > p_drop[home_j] + 5.0 && home_actual_joint[home_j] > p_drop_above_joint[home_j] + 5.0):
+        home_process7_unload_segment = 0
+    end
+    home_j = (home_j + 1)
+end
+if(home_process7_unload_segment == 1):
+    home_match_code = 19
+    home_match_valid = 1
+end
+
+at_c1_load_wait = 0
+at_c1_load = 0
+at_c1_load_end = 0
+at_c1_unload_wait = 0
+at_c1_unload = 0
+at_load_m2_wait = 0
+at_load_m2 = 0
+at_end_load_m2 = 0
+at_unload_m2_wait = 0
+at_unload_m2 = 0
+at_air_c2 = 0
+if(home_match_valid == 1):
+    if(home_match_code == 1):
+        at_c1_load_end = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH C1LOADEND")
+    end
+    if(home_match_code == 2):
+        at_c1_load = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH C1LOAD")
+    end
+    if(home_match_code == 3):
+        at_c1_load_wait = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH C1LOADWAIT")
+    end
+    if(home_match_code == 4):
+        at_c1_unload = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH C1UNLOAD")
+    end
+    if(home_match_code == 5):
+        at_c1_unload_wait = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH C1UNLOADWAIT")
+    end
+    if(home_match_code == 16):
+        log_message(1,"HOME ACTUAL POSITION MATCH C1UNLOADDOWN")
+    end
+    if(home_match_code == 6):
+        at_end_load_m2 = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH ENDLOADM2V2")
+    end
+    if(home_match_code == 7):
+        at_load_m2 = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH ENDLOADM2V1")
+    end
+    if(home_match_code == 8):
+        at_load_m2_wait = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH LOADM2_WAIT")
+    end
+    if(home_match_code == 9):
+        at_unload_m2 = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH UNLOADM2")
+    end
+    if(home_match_code == 10):
+        at_unload_m2_wait = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH UNLOADM2_WAIT")
+    end
+    if(home_match_code == 11):
+        at_air_c2 = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH AIRC2")
+    end
+    if(home_match_code == 12):
+        home_route_door_done = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH DOORC1")
+    end
+    if(home_match_code == 13):
+        home_route_door_done = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH DOORC2")
+    end
+    if(home_match_code == 14):
+        home_route_door_done = 1
+        home_already_home = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH HOMELOCATION")
+    end
+    if(home_match_code == 15):
+        log_message(1,"HOME ACTUAL POSITION MATCH LOADC2")
+    end
+    if(home_match_code == 17):
+        log_message(1,"HOME ACTUAL POSITION IN LOAD_DAOTOOL SEGMENT")
+    end
+    if(home_match_code == 18):
+        log_message(1,"HOME ACTUAL POSITION IN UNLOAD_DAOTOOL SEGMENT")
+    end
+    if(home_match_code == 19):
+        log_message(1,"HOME ACTUAL POSITION IN DROP SEGMENT")
+    end
+else:
+    home_match_code = 0
+    log_message(2,"HOME ACTUAL POSITION NOT IN SPECIAL TOLERANCE")
+end
+# Point recognition has priority. Check the danger region only
+# when the current pose does not match any taught special point.
+if(home_match_valid == 0):
+    if(home_c1_danger_side == 1):
+        log_message(2,"HOME CNC1 DANGER SIDE DETECTED AFTER POINT CHECK")
+        # [CNC36] Danger side: retreat by MoveL to the Wait point of the tool facing the chuck,
+        # then to the Door. Tool identified by J6 (Load ~ +44, Air ~ -45, Unload ~ -135);
+        # thresholds are midpoints of the active taught J6 values. Speed 30 mm/s.
+        home_c1_wait_route = 0
+        if(home_actual_joint[5] >= (p_odd_load_wait[5] + p_odd_air_v1[5]) * 0.5):
+            home_c1_wait_route = 1
+        end
+        if(home_actual_joint[5] <= (p_odd_unload_wait[5] + p_odd_air_v1[5]) * 0.5):
+            home_c1_wait_route = 2
+        end
+        if(home_c1_wait_route == 1):
+            log_message(1,"HOME CNC1 DANGER LOAD TOOL MOVEL C1LOADWAIT START")
+            home_wait_pose = kine_forward(p_odd_load_wait)
+            home_wait_pose = pose_add(home_wait_pose,p_odd_user_x_offset)
+            movl(home_wait_pose,0,30,200,0)
+            at_c1_load_wait = 1
+            home_route_hint = 1
+            log_message(1,"HOME ROUTE C1LOADWAIT COMPLETE")
+        end
+        if(home_c1_wait_route == 2):
+            log_message(1,"HOME CNC1 DANGER UNLOAD TOOL MOVEL C1UNLOADWAIT START")
+            home_wait_pose = kine_forward(p_odd_unload_wait)
+            movl(home_wait_pose,0,30,200,0)
+            at_c1_unload_wait = 1
+            home_route_hint = 1
+            log_message(1,"HOME ROUTE C1UNLOADWAIT COMPLETE")
+        end
+        # Air-blow orientation: back to the air entry point (the air Wait), then straight to the Door.
+        if(home_c1_wait_route == 0):
+            log_message(1,"HOME CNC1 DANGER AIR TOOL MOVEL AIRC1V1 START")
+            home_wait_pose = kine_forward(p_odd_air_v1)
+            movl(home_wait_pose,0,30,200,0)
+            log_message(1,"HOME ROUTE AIRC1V1 COMPLETE")
+            door_c1_keep_j6_joint = get_atl_joint_pose()
+            door_c1_keep_j6_joint[0] = p_odd_door[0]
+            door_c1_keep_j6_joint[1] = p_odd_door[1]
+            door_c1_keep_j6_joint[2] = p_odd_door[2]
+            door_c1_keep_j6_joint[3] = p_odd_door[3]
+            door_c1_keep_j6_joint[4] = p_odd_door[4]
+            door_c1_keep_j6_pose = kine_forward(door_c1_keep_j6_joint)
+            log_message(1,"HOME ROUTE MOVEL DOORC1 KEEP CURRENT J6")
+                movl(door_c1_keep_j6_pose,0,30,200,0)
+            log_message(1,"AT DOORC1 KEEP CURRENT J6 NO ROTATION")
+            home_route_door_done = 1
+            home_route_hint = 1
+            at_c1_load_wait = 0
+            at_c1_load = 0
+            at_c1_load_end = 0
+            at_c1_unload_wait = 0
+            at_c1_unload = 0
+            at_load_m2_wait = 0
+            at_load_m2 = 0
+            at_end_load_m2 = 0
+            at_unload_m2_wait = 0
+            at_unload_m2 = 0
+            at_air_c2 = 0
+            log_message(1,"HOME ROUTE DOORC1 COMPLETE")
+        end
+    end
+end
+if(home_match_valid == 0):
+    # Do not execute the CNC2 escape after the CNC1 escape has
+    # already reached DoorC1, even if the two coarse danger
+    # regions overlap at an unusual robot pose.
+    if(home_route_door_done == 0):
+        if(home_c2_danger_side == 1):
+        log_message(2,"HOME CNC2 DANGER SIDE DETECTED AFTER POINT CHECK")
+        # [CNC36] Danger side: retreat by MoveL to the Wait point of the tool facing the chuck,
+        # then to the Door. Tool identified by J6 (Load ~ +44, Air ~ -45, Unload ~ -135);
+        # thresholds are midpoints of the active taught J6 values. Speed 30 mm/s.
+        home_c2_wait_route = 0
+        if(home_actual_joint[5] >= (p_even_load_wait[5] + p_even_air_v1[5]) * 0.5):
+            home_c2_wait_route = 1
+        end
+        if(home_actual_joint[5] <= (p_even_unload_wait[5] + p_even_air_v1[5]) * 0.5):
+            home_c2_wait_route = 2
+        end
+        if(home_c2_wait_route == 1):
+            log_message(1,"HOME CNC2 DANGER LOAD TOOL MOVEL LOADM2_WAIT START")
+            home_wait_pose = kine_forward(p_even_load_wait)
+            home_wait_pose = pose_add(home_wait_pose,p_even_user_x_offset)
+            movl(home_wait_pose,0,30,200,0)
+            at_load_m2_wait = 1
+            home_route_hint = 2
+            log_message(1,"HOME ROUTE LOADM2_WAIT COMPLETE")
+        end
+        if(home_c2_wait_route == 2):
+            log_message(1,"HOME CNC2 DANGER UNLOAD TOOL MOVEL UNLOADM2_WAIT START")
+            home_wait_pose = kine_forward(p_even_unload_wait)
+            movl(home_wait_pose,0,30,200,0)
+            at_unload_m2_wait = 1
+            home_route_hint = 2
+            log_message(1,"HOME ROUTE UNLOADM2_WAIT COMPLETE")
+        end
+        # Air-blow orientation: back to the air entry point (the air Wait), then straight to the Door.
+        if(home_c2_wait_route == 0):
+            log_message(1,"HOME CNC2 DANGER AIR TOOL MOVEL AIRC2V1 START")
+            home_wait_pose = kine_forward(p_even_air_v1)
+            movl(home_wait_pose,0,30,200,0)
+            log_message(1,"HOME ROUTE AIRC2V1 COMPLETE")
+            door_c2_keep_j6_joint = get_atl_joint_pose()
+            door_c2_keep_j6_joint[0] = p_even_door[0]
+            door_c2_keep_j6_joint[1] = p_even_door[1]
+            door_c2_keep_j6_joint[2] = p_even_door[2]
+            door_c2_keep_j6_joint[3] = p_even_door[3]
+            door_c2_keep_j6_joint[4] = p_even_door[4]
+            door_c2_keep_j6_pose = kine_forward(door_c2_keep_j6_joint)
+            log_message(1,"HOME ROUTE MOVEL DOORC2 KEEP CURRENT J6")
+                movl(door_c2_keep_j6_pose,0,30,200,0)
+            log_message(1,"AT DOORC2 KEEP CURRENT J6 NO ROTATION")
+            home_route_door_done = 1
+            home_route_hint = 2
+            at_c1_load_wait = 0
+            at_c1_load = 0
+            at_c1_load_end = 0
+            at_c1_unload_wait = 0
+            at_c1_unload = 0
+            at_load_m2_wait = 0
+            at_load_m2 = 0
+            at_end_load_m2 = 0
+            at_unload_m2_wait = 0
+            at_unload_m2 = 0
+            at_air_c2 = 0
+                log_message(1,"HOME ROUTE DOORC2 COMPLETE")
+        end
+        end
+    end
+end
+if(at_c1_load_end == 1):
+    log_message(1,"HOME ROUTE CURRENT AT C1LOADEND")
+    log_message(1,"HOME ROUTE MOVEL C1LOAD START")
+    p_c1_load_pose = kine_forward(p_odd_load)
+    p_c1_load_pose = pose_add(p_c1_load_pose,p_odd_user_x_offset)
+    movl(p_c1_load_pose,0,30,200,0)
+    at_c1_load_end = 0
+    at_c1_load = 1
+    home_route_hint = 1
+    log_message(1,"HOME ROUTE C1LOAD COMPLETE")
+end
+if(at_c1_load == 1):
+    log_message(1,"HOME ROUTE CURRENT AT C1LOAD")
+    log_message(1,"HOME ROUTE MOVEL C1LOADWAIT START")
+    p_c1_load_wait_pose = kine_forward(p_odd_load_wait)
+    p_c1_load_wait_pose = pose_add(p_c1_load_wait_pose,p_odd_user_x_offset)
+    movl(p_c1_load_wait_pose,0,speed_movel_fast,3500,0)
+    at_c1_load = 0
+    at_c1_load_wait = 1
+    home_route_hint = 1
+    log_message(1,"HOME ROUTE C1LOADWAIT COMPLETE")
+end
+if(at_c1_load_wait == 1):
+    log_message(1,"HOME ROUTE CURRENT AT C1LOADWAIT")
+    log_message(1,"HOME ROUTE MOVEJ DOORC1 START")
+    door_c1_keep_j6_joint = get_atl_joint_pose()
+    door_c1_keep_j6_joint[0] = p_odd_door[0]
+    door_c1_keep_j6_joint[1] = p_odd_door[1]
+    door_c1_keep_j6_joint[2] = p_odd_door[2]
+    door_c1_keep_j6_joint[3] = p_odd_door[3]
+    door_c1_keep_j6_joint[4] = p_odd_door[4]
+    movj(door_c1_keep_j6_joint,0,speed_movej_fast,720,0)
+    home_route_door_done = 1
+    log_message(1,"HOME ROUTE DOORC1 COMPLETE")
+end
+if(at_c1_unload == 1):
+    log_message(1,"HOME ROUTE CURRENT AT C1UNLOAD")
+    log_message(1,"HOME ROUTE MOVEL C1UNLOADWAIT START")
+    p_c1_unload_wait_pose = kine_forward(p_odd_unload_wait)
+    movl(p_c1_unload_wait_pose,0,speed_movel_fast,3500,0)
+    at_c1_unload = 0
+    at_c1_unload_wait = 1
+    home_route_hint = 1
+    log_message(1,"HOME ROUTE C1UNLOADWAIT COMPLETE")
+end
+if(home_match_code == 16):
+    log_message(1,"HOME ROUTE CURRENT AT C1UNLOADDOWN")
+    log_message(1,"HOME ROUTE MOVEL C1UNLOADDOWN TO C1UNLOADWAIT START")
+    p_c1_unload_wait_pose = kine_forward(p_odd_unload_wait)
+    movl(p_c1_unload_wait_pose,0,speed_movel_fast,3500,0)
+    at_c1_unload_wait = 1
+    home_route_hint = 1
+    log_message(1,"HOME ROUTE C1UNLOADWAIT COMPLETE")
+end
+if(at_c1_unload_wait == 1):
+    log_message(1,"HOME ROUTE CURRENT AT C1UNLOADWAIT")
+    log_message(1,"HOME ROUTE MOVEJ DOORC1 START")
+    door_c1_keep_j6_joint = get_atl_joint_pose()
+    door_c1_keep_j6_joint[0] = p_odd_door[0]
+    door_c1_keep_j6_joint[1] = p_odd_door[1]
+    door_c1_keep_j6_joint[2] = p_odd_door[2]
+    door_c1_keep_j6_joint[3] = p_odd_door[3]
+    door_c1_keep_j6_joint[4] = p_odd_door[4]
+    movj(door_c1_keep_j6_joint,0,speed_movej_fast,720,0)
+    home_route_door_done = 1
+    log_message(1,"HOME ROUTE DOORC1 COMPLETE")
+end
+if(at_end_load_m2 == 1):
+    log_message(1,"HOME ROUTE CURRENT AT ENDLOADM2V2")
+    log_message(1,"HOME ROUTE MOVEL ENDLOADM2V1 START")
+    p_end_load_m2v1_pose = kine_forward(p_even_load_end)
+    p_end_load_m2v1_pose = pose_add(p_end_load_m2v1_pose,p_even_user_x_offset)
+                movl(p_end_load_m2v1_pose,0,30,200,0)
+    at_end_load_m2 = 0
+    at_load_m2 = 1
+    home_route_hint = 2
+    log_message(1,"HOME ROUTE ENDLOADM2V1 COMPLETE")
+end
+if(at_load_m2 == 1):
+    log_message(1,"HOME ROUTE CURRENT AT ENDLOADM2V1")
+    log_message(1,"HOME ROUTE MOVEL LOADM2_WAIT START")
+    p_load_m2_wait_pose = kine_forward(p_even_load_wait)
+    p_load_m2_wait_pose = pose_add(p_load_m2_wait_pose,p_even_user_x_offset)
+    movl(p_load_m2_wait_pose,0,speed_movel_fast,3500,0)
+    at_load_m2 = 0
+    at_load_m2_wait = 1
+    home_route_hint = 2
+    log_message(1,"HOME ROUTE LOADM2_WAIT COMPLETE")
+end
+if(home_match_code == 15):
+    log_message(1,"HOME ROUTE CURRENT AT LOADC2")
+    log_message(1,"HOME ROUTE MOVEL LOADC2 TO LOADM2_WAIT START")
+    p_load_m2_wait_pose = kine_forward(p_even_load_wait)
+    p_load_m2_wait_pose = pose_add(p_load_m2_wait_pose,p_even_user_x_offset)
+    movl(p_load_m2_wait_pose,0,speed_movel_fast,3500,0)
+    at_load_m2_wait = 1
+    home_route_hint = 2
+    log_message(1,"HOME ROUTE LOADM2_WAIT COMPLETE")
+end
+if(at_load_m2_wait == 1):
+    log_message(1,"HOME ROUTE CURRENT AT LOADM2_WAIT")
+    log_message(1,"HOME ROUTE MOVEJ DOORC2 START")
+    door_c2_keep_j6_joint = get_atl_joint_pose()
+    door_c2_keep_j6_joint[0] = p_even_door[0]
+    door_c2_keep_j6_joint[1] = p_even_door[1]
+    door_c2_keep_j6_joint[2] = p_even_door[2]
+    door_c2_keep_j6_joint[3] = p_even_door[3]
+    door_c2_keep_j6_joint[4] = p_even_door[4]
+    movj(door_c2_keep_j6_joint,0,speed_movej_fast,720,0)
+    home_route_door_done = 1
+    log_message(1,"HOME ROUTE DOORC2 COMPLETE")
+end
+if(at_unload_m2 == 1):
+    log_message(1,"HOME ROUTE CURRENT AT UNLOADM2")
+    log_message(1,"HOME ROUTE MOVEL UNLOADM2_WAIT START")
+    p_unload_m2_wait_pose = kine_forward(p_even_unload_wait)
+    movl(p_unload_m2_wait_pose,0,speed_movel_fast,3500,0)
+    at_unload_m2 = 0
+    at_unload_m2_wait = 1
+    home_route_hint = 2
+    log_message(1,"HOME ROUTE UNLOADM2_WAIT COMPLETE")
+end
+if(at_unload_m2_wait == 1):
+    log_message(1,"HOME ROUTE CURRENT AT UNLOADM2_WAIT")
+    log_message(1,"HOME ROUTE MOVEJ DOORC2 START")
+    door_c2_keep_j6_joint = get_atl_joint_pose()
+    door_c2_keep_j6_joint[0] = p_even_door[0]
+    door_c2_keep_j6_joint[1] = p_even_door[1]
+    door_c2_keep_j6_joint[2] = p_even_door[2]
+    door_c2_keep_j6_joint[3] = p_even_door[3]
+    door_c2_keep_j6_joint[4] = p_even_door[4]
+    movj(door_c2_keep_j6_joint,0,speed_movej_fast,720,0)
+    home_route_door_done = 1
+    log_message(1,"HOME ROUTE DOORC2 COMPLETE")
+end
+if(at_air_c2 == 1):
+    log_message(1,"HOME ROUTE CURRENT AT AIRC2")
+    # [CNC36] Retreat AirC2 -> AirC2v1 (reverse of the entry path) before DoorC2.
+    log_message(1,"HOME ROUTE MOVEL AIRC2V1 START")
+    home_wait_pose = kine_forward(p_even_air_v1)
+    movl(home_wait_pose,0,30,200,0)
+    log_message(1,"HOME ROUTE AIRC2V1 COMPLETE")
+    log_message(1,"HOME ROUTE MOVEJ DOORC2 START")
+    door_c2_keep_j6_joint = get_atl_joint_pose()
+    door_c2_keep_j6_joint[0] = p_even_door[0]
+    door_c2_keep_j6_joint[1] = p_even_door[1]
+    door_c2_keep_j6_joint[2] = p_even_door[2]
+    door_c2_keep_j6_joint[3] = p_even_door[3]
+    door_c2_keep_j6_joint[4] = p_even_door[4]
+    movj(door_c2_keep_j6_joint,0,speed_movej_fast,720,0)
+    home_route_door_done = 1
+    at_air_c2 = 0
+    log_message(1,"HOME ROUTE DOORC2 COMPLETE")
+end
+if(home_match_code == 17):
+    log_message(1,"HOME ROUTE LOAD_DAOTOOL SEGMENT TO LOAD_DAOTOOL_WAIT")
+    movj(p_load_daotool_wait,0,speed_movej_fast,720,0)
+    home_route_door_done = 1
+    log_message(1,"HOME ROUTE LOAD_DAOTOOL_WAIT COMPLETE")
+end
+if(home_match_code == 18):
+    log_message(1,"HOME ROUTE UNLOAD_DAOTOOL SEGMENT TO UNLOAD_DAOTOOL_WAIT")
+    movj(p_unload_daotool_wait,0,speed_movej_fast,720,0)
+    home_route_door_done = 1
+    log_message(1,"HOME ROUTE UNLOAD_DAOTOOL_WAIT COMPLETE")
+end
+if(home_match_code == 19):
+    log_message(1,"HOME ROUTE DROP SEGMENT MOVEL STRAIGHT UP TO DROP ABOVE")
+    movl(p_drop_above_pose,0,30,200,0)
+    home_route_door_done = 1
+    log_message(1,"HOME ROUTE DROP ABOVE COMPLETE")
+end
+# AI16 is lower priority than all recognized points and danger regions.
+# It is used only when no route above has already reached a safe point/door.
+if(home_route_door_done == 0):
+    if(ai16_home_door == 1):
+        log_message(1,"HOME AI16 CNC1 CNC3 CNC5 VIA DOORC1")
+        door_c1_keep_j6_joint = get_atl_joint_pose()
+        door_c1_keep_j6_joint[0] = p_odd_door[0]
+        door_c1_keep_j6_joint[1] = p_odd_door[1]
+        door_c1_keep_j6_joint[2] = p_odd_door[2]
+        door_c1_keep_j6_joint[3] = p_odd_door[3]
+        door_c1_keep_j6_joint[4] = p_odd_door[4]
+        movj(door_c1_keep_j6_joint,0,speed_movej_fast,720,0)
+        home_route_door_done = 1
+    end
+    if(ai16_home_door == 2):
+        log_message(1,"HOME AI16 CNC2 CNC4 CNC6 VIA DOORC2")
+        door_c2_keep_j6_joint = get_atl_joint_pose()
+        door_c2_keep_j6_joint[0] = p_even_door[0]
+        door_c2_keep_j6_joint[1] = p_even_door[1]
+        door_c2_keep_j6_joint[2] = p_even_door[2]
+        door_c2_keep_j6_joint[3] = p_even_door[3]
+        door_c2_keep_j6_joint[4] = p_even_door[4]
+        movj(door_c2_keep_j6_joint,0,speed_movej_fast,720,0)
+        home_route_door_done = 1
+    end
+end
+# Fixed route based on the last known robot position group.
+# C1 points always use DoorC1; C2 points always use DoorC2.
+if(home_route_door_done == 0):
+    if(home_route_hint == 1):
+        log_message(1,"HOME POSITION ROUTE CNC1 VIA DOORC1")
+        door_c1_keep_j6_joint = get_atl_joint_pose()
+        door_c1_keep_j6_joint[0] = p_odd_door[0]
+        door_c1_keep_j6_joint[1] = p_odd_door[1]
+        door_c1_keep_j6_joint[2] = p_odd_door[2]
+        door_c1_keep_j6_joint[3] = p_odd_door[3]
+        door_c1_keep_j6_joint[4] = p_odd_door[4]
+        movj(door_c1_keep_j6_joint,0,speed_movej_fast,720,0)
+        home_route_door_done = 1
+    end
+    if(home_route_hint == 2):
+        log_message(1,"HOME POSITION ROUTE CNC2 VIA DOORC2")
+        door_c2_keep_j6_joint = get_atl_joint_pose()
+        door_c2_keep_j6_joint[0] = p_even_door[0]
+        door_c2_keep_j6_joint[1] = p_even_door[1]
+        door_c2_keep_j6_joint[2] = p_even_door[2]
+        door_c2_keep_j6_joint[3] = p_even_door[3]
+        door_c2_keep_j6_joint[4] = p_even_door[4]
+        movj(door_c2_keep_j6_joint,0,speed_movej_fast,720,0)
+        home_route_door_done = 1
+    end
+end
+# Fallback requested by the operator: after checking every
+# special point and both danger regions, an unknown position
+# moves directly to HomeLocation by MoveJ.
+if(home_route_door_done == 0):
+    log_message(2,"HOME NO SPECIAL POINT OR DANGER REGION")
+    log_message(1,"HOME UNKNOWN POSITION MOVEJ HOME DIRECT START")
+    movj(p_home_location,0,speed_movej_fast,720,0)
+    home_route_door_done = 1
+    home_already_home = 1
+    log_message(1,"HOME UNKNOWN POSITION HOMELOCATION COMPLETE")
+end
+if(home_route_door_done == 1):
+    if(home_already_home == 0):
+        log_message(1,"HOME PROCESS MOVEJ HOMELOCATION START")
+        movj(p_home_location,0,speed_movej_fast,720,0)
+        log_message(1,"HOME PROCESS HOMELOCATION COMPLETE")
+    else:
+        log_message(1,"HOME PROCESS ALREADY AT HOMELOCATION")
+    end
+    at_c1_load_wait = 0
+    at_c1_load = 0
+    at_c1_load_end = 0
+    at_c1_unload_wait = 0
+    at_c1_unload = 0
+    at_load_m2_wait = 0
+    at_load_m2 = 0
+    at_end_load_m2 = 0
+    at_unload_m2_wait = 0
+    at_unload_m2 = 0
+    at_air_c2 = 0
+    home_route_hint = 0
+    sleep(0.01)
+    log_message(1,"DO16 ON ROBOT AT HOME WAIT DI90 OFF")
+end
+movj(p_home_location,0,speed_movej_fast,720,0)
+movj(p_drop_above_joint,0,speed_movej_fast,720,0)
+movl(sim_mid_pose,0,50,200,0)
+home_route_door_done = 0
+home_already_home = 0
+home_route_hint = 0
+log_message(1,"SIM DROP HOME 2 50 MM ABOVE DROP EXPECT IN DROP SEGMENT THEN MOVEL UP THEN HOME")
+home_actual_joint = get_atl_joint_pose()
+home_actual_tcp = get_atl_tcp_pose()
+# AI16 contains the CNC number. Odd CNCs use DoorC1; even CNCs use DoorC2.
+# Analog ranges tolerate +/-0.5 around the integer command.
+ai16_home_cnc = sim_ai16
+ai16_home_door = 0
+if(ai16_home_cnc >= 0.5):
+    if(ai16_home_cnc < 1.5):
+        ai16_home_door = 1
+    end
+end
+if(ai16_home_cnc >= 1.5):
+    if(ai16_home_cnc < 2.5):
+        ai16_home_door = 2
+    end
+end
+if(ai16_home_cnc >= 2.5):
+    if(ai16_home_cnc < 3.5):
+        ai16_home_door = 1
+    end
+end
+if(ai16_home_cnc >= 3.5):
+    if(ai16_home_cnc < 4.5):
+        ai16_home_door = 2
+    end
+end
+if(ai16_home_cnc >= 4.5):
+    if(ai16_home_cnc < 5.5):
+        ai16_home_door = 1
+    end
+end
+if(ai16_home_cnc >= 5.5):
+    if(ai16_home_cnc < 6.5):
+        ai16_home_door = 2
+    end
+end
+# [CNC36] Select the CNC point set for Home recognition from AI16.
+# AI16 1/2 -> CNC1/2 set, 3/4 -> CNC3/4 set, 5/6 -> CNC5/6 set.
+# If AI16 is outside 0.5..6.5, keep the set of the last executed Case.
+if(ai16_home_cnc >= 0.5):
+    if(ai16_home_cnc < 2.5):
+        cnc_pair = 1
+    end
+end
+if(ai16_home_cnc >= 2.5):
+    if(ai16_home_cnc < 4.5):
+        cnc_pair = 2
+    end
+end
+if(ai16_home_cnc >= 4.5):
+    if(ai16_home_cnc < 6.5):
+        cnc_pair = 3
+    end
+end
+# [CNC36] Load the active CNC point set (p_odd_* / p_even_*) from cnc_pair.
+if(cnc_pair == 1):
+    p_odd_door = p_door_c1
+    p_even_door = p_door_c2
+    p_odd_user_x_offset = p_c1_user_x_offset
+    p_odd_air_v1 = p_air_c1v1
+    p_odd_air_switch_tool = p_air_switch_tool
+    p_odd_load_wait = p_c1_load_wait
+    p_odd_load = p_c1_load
+    p_odd_load_end = p_c1_load_end
+    p_odd_unload_wait = p_c1_unload_wait
+    p_odd_unload = p_c1_unload
+    p_odd_unload_down = p_c1_unload_down
+    p_even_user_x_offset = p_c2_user_x_offset
+    p_even_air_v1 = p_air_c2v1
+    p_even_air = p_air_c2
+    p_even_load_wait = p_load_m2_wait
+    p_even_load = p_load_c2
+    p_even_load_end = p_end_load_m2v1
+    p_even_unload_wait = p_unload_m2_wait
+    p_even_unload = p_unload_m2
+    log_message(1,"ACTIVE POINT SET CNC1 CNC2")
+end
+if(cnc_pair == 2):
+    p_odd_door = p_door_c3
+    p_even_door = p_door_c4
+    p_odd_user_x_offset = p_c3_user_x_offset
+    p_odd_air_v1 = p_c3_air_v1
+    p_odd_air_switch_tool = p_c3_air_switch_tool
+    p_odd_load_wait = p_c3_load_wait
+    p_odd_load = p_c3_load
+    p_odd_load_end = p_c3_load_end
+    p_odd_unload_wait = p_c3_unload_wait
+    p_odd_unload = p_c3_unload
+    p_odd_unload_down = p_c3_unload_down
+    p_even_user_x_offset = p_c4_user_x_offset
+    p_even_air_v1 = p_c4_air_v1
+    p_even_air = p_c4_air
+    p_even_load_wait = p_c4_load_wait
+    p_even_load = p_c4_load
+    p_even_load_end = p_c4_load_end
+    p_even_unload_wait = p_c4_unload_wait
+    p_even_unload = p_c4_unload
+    log_message(1,"ACTIVE POINT SET CNC3 CNC4")
+end
+if(cnc_pair == 3):
+    p_odd_door = p_door_c5
+    p_even_door = p_door_c6
+    p_odd_user_x_offset = p_c5_user_x_offset
+    p_odd_air_v1 = p_c5_air_v1
+    p_odd_air_switch_tool = p_c5_air_switch_tool
+    p_odd_load_wait = p_c5_load_wait
+    p_odd_load = p_c5_load
+    p_odd_load_end = p_c5_load_end
+    p_odd_unload_wait = p_c5_unload_wait
+    p_odd_unload = p_c5_unload
+    p_odd_unload_down = p_c5_unload_down
+    p_even_user_x_offset = p_c6_user_x_offset
+    p_even_air_v1 = p_c6_air_v1
+    p_even_air = p_c6_air
+    p_even_load_wait = p_c6_load_wait
+    p_even_load = p_c6_load
+    p_even_load_end = p_c6_load_end
+    p_even_unload_wait = p_c6_unload_wait
+    p_even_unload = p_c6_unload
+    log_message(1,"ACTIVE POINT SET CNC5 CNC6")
+end
+home_match_code = 0
+home_best_joint_error = 999999.0
+home_c1_danger_side = 0
+home_c2_danger_side = 0
+
+# get_atl_tcp_pose() returns Base coordinates, while both danger
+# boundaries were taught in usrfr_thanh.  Convert Base XYZ to
+# usrfr_thanh inside each comparison.  Direct expressions are used
+# because this controller rejects arithmetic variable assignments.
+# usrfr_thanh = [345.833,-489.782,-136.233,-0.093,-0.065,45.114].
+# CNC1 straight X boundary: both P1/P2 use DoorC1 X = 679.362.
+# CNC1 danger Y range: 496.706 <= Y <= 755.117.
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) >= 496.706):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 755.117):
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 496.706):
+    if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) > 679.362):
+        home_c1_danger_side = 1
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 496.706):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 550.000):
+        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) > 679.362):
+            home_c1_danger_side = 1
+        end
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 550.000):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 600.000):
+        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) > 679.362):
+            home_c1_danger_side = 1
+        end
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 600.000):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 650.000):
+        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) > 679.362):
+            home_c1_danger_side = 1
+        end
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 650.000):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 700.000):
+        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) > 679.362):
+            home_c1_danger_side = 1
+        end
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 700.000):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 755.117):
+        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) > 679.362):
+            home_c1_danger_side = 1
+        end
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 755.117):
+    if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) > 679.362):
+        home_c1_danger_side = 1
+    end
+end
+    end
+end
+
+# CNC2 straight X boundary: both P1/P2 use DoorC2 X = -365.358.
+# The CNC2 working side has X smaller than the boundary line.
+# CNC2 danger Y range: 321.336 <= Y <= 568.492.
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) >= 321.336):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 568.492):
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 321.336):
+    if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) < -365.358):
+        home_c2_danger_side = 1
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 321.336):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 375.000):
+        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) < -365.358):
+            home_c2_danger_side = 1
+        end
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 375.000):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 425.000):
+        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) < -365.358):
+            home_c2_danger_side = 1
+        end
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 425.000):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 475.000):
+        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) < -365.358):
+            home_c2_danger_side = 1
+        end
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 475.000):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 525.000):
+        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) < -365.358):
+            home_c2_danger_side = 1
+        end
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 525.000):
+    if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) <= 568.492):
+        if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) < -365.358):
+            home_c2_danger_side = 1
+        end
+    end
+end
+if((-0.7085100607 * (home_actual_tcp[0] - 345.833) + 0.7056988446 * (home_actual_tcp[1] + 489.782) - 0.0016231544 * (home_actual_tcp[2] + 136.233)) > 568.492):
+    if((0.7056980154 * (home_actual_tcp[0] - 345.833) + 0.7085118376 * (home_actual_tcp[1] + 489.782) + 0.0011344638 * (home_actual_tcp[2] + 136.233)) < -365.358):
+        home_c2_danger_side = 1
+    end
+end
+    end
+end
+
+home_test_tcp = kine_forward(p_odd_load_end)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 1
+end
+home_test_tcp = kine_forward(p_odd_load)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 2
+end
+home_test_tcp = kine_forward(p_odd_load_wait)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 3
+end
+home_test_tcp = kine_forward(p_odd_unload)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 4
+end
+home_test_tcp = kine_forward(p_odd_unload_wait)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 5
+end
+home_test_tcp = kine_forward(p_odd_unload_down)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 16
+end
+home_test_tcp = kine_forward(p_end_load_m2v2)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 6
+end
+home_test_tcp = kine_forward(p_even_load_end)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 7
+end
+home_test_tcp = kine_forward(p_even_load_wait)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 8
+end
+home_test_tcp = kine_forward(p_even_unload)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 9
+end
+home_test_tcp = kine_forward(p_even_unload_wait)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 10
+end
+home_test_tcp = kine_forward(p_even_air)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 11
+end
+home_test_tcp = kine_forward(p_even_load)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 15
+end
+home_test_tcp = kine_forward(p_odd_door)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 12
+end
+home_test_tcp = kine_forward(p_even_door)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 13
+end
+home_test_tcp = kine_forward(p_home_location)
+home_test_error = pose_dist(home_actual_tcp,home_test_tcp)
+if(home_test_error < home_best_joint_error):
+    home_best_joint_error = home_test_error
+    home_match_code = 14
+end
+
+home_match_joint = p_home_location
+if(home_match_code == 1):
+    home_match_joint = p_odd_load_end
+end
+if(home_match_code == 2):
+    home_match_joint = p_odd_load
+end
+if(home_match_code == 3):
+    home_match_joint = p_odd_load_wait
+end
+if(home_match_code == 4):
+    home_match_joint = p_odd_unload
+end
+if(home_match_code == 5):
+    home_match_joint = p_odd_unload_wait
+end
+if(home_match_code == 16):
+    home_match_joint = p_odd_unload_down
+end
+if(home_match_code == 6):
+    home_match_joint = p_end_load_m2v2
+end
+if(home_match_code == 7):
+    home_match_joint = p_even_load_end
+end
+if(home_match_code == 8):
+    home_match_joint = p_even_load_wait
+end
+if(home_match_code == 9):
+    home_match_joint = p_even_unload
+end
+if(home_match_code == 10):
+    home_match_joint = p_even_unload_wait
+end
+if(home_match_code == 11):
+    home_match_joint = p_even_air
+end
+if(home_match_code == 12):
+    home_match_joint = p_odd_door
+end
+if(home_match_code == 13):
+    home_match_joint = p_even_door
+end
+if(home_match_code == 15):
+    home_match_joint = p_even_load
+end
+
+home_match_tcp = kine_forward(home_match_joint)
+# Validate Cartesian position axis by axis. pose_dist also includes
+# orientation on this controller and caused valid taught points to
+# be rejected as UNKNOWN even when XYZ was within 20 mm.
+home_match_valid = 1
+if(home_actual_tcp[0] < home_match_tcp[0] - 20.0):
+    home_match_valid = 0
+end
+if(home_actual_tcp[0] > home_match_tcp[0] + 20.0):
+    home_match_valid = 0
+end
+if(home_actual_tcp[1] < home_match_tcp[1] - 20.0):
+    home_match_valid = 0
+end
+if(home_actual_tcp[1] > home_match_tcp[1] + 20.0):
+    home_match_valid = 0
+end
+if(home_actual_tcp[2] < home_match_tcp[2] - 20.0):
+    home_match_valid = 0
+end
+if(home_actual_tcp[2] > home_match_tcp[2] + 20.0):
+    home_match_valid = 0
+end
+# [CNC36] Joint tolerance +/-5 deg is computed from the matched taught point itself,
+# so re-taught points and CNC3..CNC6 points need no extra *_min/*_max literal arrays.
+# Arithmetic inside if() is already used by the TCP check above on this controller.
+if(home_actual_joint[0] < home_match_joint[0] - 5.0):
+    home_match_valid = 0
+end
+if(home_actual_joint[0] > home_match_joint[0] + 5.0):
+    home_match_valid = 0
+end
+if(home_actual_joint[1] < home_match_joint[1] - 5.0):
+    home_match_valid = 0
+end
+if(home_actual_joint[1] > home_match_joint[1] + 5.0):
+    home_match_valid = 0
+end
+if(home_actual_joint[2] < home_match_joint[2] - 5.0):
+    home_match_valid = 0
+end
+if(home_actual_joint[2] > home_match_joint[2] + 5.0):
+    home_match_valid = 0
+end
+if(home_actual_joint[3] < home_match_joint[3] - 5.0):
+    home_match_valid = 0
+end
+if(home_actual_joint[3] > home_match_joint[3] + 5.0):
+    home_match_valid = 0
+end
+if(home_actual_joint[4] < home_match_joint[4] - 5.0):
+    home_match_valid = 0
+end
+if(home_actual_joint[4] > home_match_joint[4] + 5.0):
+    home_match_valid = 0
+end
+if(home_actual_joint[5] < home_match_joint[5] - 5.0):
+    home_match_valid = 0
+end
+if(home_actual_joint[5] > home_match_joint[5] + 5.0):
+    home_match_valid = 0
+end
+
+# Override normal point matching when the robot is at or between
+# Load_daotool and Load_daotool_Wait.
+home_load_daotool_segment = 1
+if(home_actual_joint[0] < p_load_daotool_segment_min[0]):
+    home_load_daotool_segment = 0
+end
+if(home_actual_joint[0] > p_load_daotool_segment_max[0]):
+    home_load_daotool_segment = 0
+end
+if(home_actual_joint[1] < p_load_daotool_segment_min[1]):
+    home_load_daotool_segment = 0
+end
+if(home_actual_joint[1] > p_load_daotool_segment_max[1]):
+    home_load_daotool_segment = 0
+end
+if(home_actual_joint[2] < p_load_daotool_segment_min[2]):
+    home_load_daotool_segment = 0
+end
+if(home_actual_joint[2] > p_load_daotool_segment_max[2]):
+    home_load_daotool_segment = 0
+end
+if(home_actual_joint[3] < p_load_daotool_segment_min[3]):
+    home_load_daotool_segment = 0
+end
+if(home_actual_joint[3] > p_load_daotool_segment_max[3]):
+    home_load_daotool_segment = 0
+end
+if(home_actual_joint[4] < p_load_daotool_segment_min[4]):
+    home_load_daotool_segment = 0
+end
+if(home_actual_joint[4] > p_load_daotool_segment_max[4]):
+    home_load_daotool_segment = 0
+end
+if(home_actual_joint[5] < p_load_daotool_segment_min[5]):
+    home_load_daotool_segment = 0
+end
+if(home_actual_joint[5] > p_load_daotool_segment_max[5]):
+    home_load_daotool_segment = 0
+end
+
+# Same recognition for unload_daotool and unload_daotool_Wait.
+home_unload_daotool_segment = 1
+if(home_actual_joint[0] < p_unload_daotool_segment_min[0]):
+    home_unload_daotool_segment = 0
+end
+if(home_actual_joint[0] > p_unload_daotool_segment_max[0]):
+    home_unload_daotool_segment = 0
+end
+if(home_actual_joint[1] < p_unload_daotool_segment_min[1]):
+    home_unload_daotool_segment = 0
+end
+if(home_actual_joint[1] > p_unload_daotool_segment_max[1]):
+    home_unload_daotool_segment = 0
+end
+if(home_actual_joint[2] < p_unload_daotool_segment_min[2]):
+    home_unload_daotool_segment = 0
+end
+if(home_actual_joint[2] > p_unload_daotool_segment_max[2]):
+    home_unload_daotool_segment = 0
+end
+if(home_actual_joint[3] < p_unload_daotool_segment_min[3]):
+    home_unload_daotool_segment = 0
+end
+if(home_actual_joint[3] > p_unload_daotool_segment_max[3]):
+    home_unload_daotool_segment = 0
+end
+if(home_actual_joint[4] < p_unload_daotool_segment_min[4]):
+    home_unload_daotool_segment = 0
+end
+if(home_actual_joint[4] > p_unload_daotool_segment_max[4]):
+    home_unload_daotool_segment = 0
+end
+if(home_actual_joint[5] < p_unload_daotool_segment_min[5]):
+    home_unload_daotool_segment = 0
+end
+if(home_actual_joint[5] > p_unload_daotool_segment_max[5]):
+    home_unload_daotool_segment = 0
+end
+
+if(home_load_daotool_segment == 1):
+    home_match_code = 17
+    home_match_valid = 1
+end
+if(home_unload_daotool_segment == 1):
+    home_match_code = 18
+    home_match_valid = 1
+end
+
+# [DROP] Recognize any stopped position between the drop point and the point 100 mm above it:
+# a joint is outside when it is beyond BOTH endpoints by more than 5 degrees.
+home_process7_unload_segment = 1
+home_j = 0
+while(home_j < 6):
+    if(home_actual_joint[home_j] < p_drop[home_j] - 5.0 && home_actual_joint[home_j] < p_drop_above_joint[home_j] - 5.0):
+        home_process7_unload_segment = 0
+    end
+    if(home_actual_joint[home_j] > p_drop[home_j] + 5.0 && home_actual_joint[home_j] > p_drop_above_joint[home_j] + 5.0):
+        home_process7_unload_segment = 0
+    end
+    home_j = (home_j + 1)
+end
+if(home_process7_unload_segment == 1):
+    home_match_code = 19
+    home_match_valid = 1
+end
+
+at_c1_load_wait = 0
+at_c1_load = 0
+at_c1_load_end = 0
+at_c1_unload_wait = 0
+at_c1_unload = 0
+at_load_m2_wait = 0
+at_load_m2 = 0
+at_end_load_m2 = 0
+at_unload_m2_wait = 0
+at_unload_m2 = 0
+at_air_c2 = 0
+if(home_match_valid == 1):
+    if(home_match_code == 1):
+        at_c1_load_end = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH C1LOADEND")
+    end
+    if(home_match_code == 2):
+        at_c1_load = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH C1LOAD")
+    end
+    if(home_match_code == 3):
+        at_c1_load_wait = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH C1LOADWAIT")
+    end
+    if(home_match_code == 4):
+        at_c1_unload = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH C1UNLOAD")
+    end
+    if(home_match_code == 5):
+        at_c1_unload_wait = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH C1UNLOADWAIT")
+    end
+    if(home_match_code == 16):
+        log_message(1,"HOME ACTUAL POSITION MATCH C1UNLOADDOWN")
+    end
+    if(home_match_code == 6):
+        at_end_load_m2 = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH ENDLOADM2V2")
+    end
+    if(home_match_code == 7):
+        at_load_m2 = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH ENDLOADM2V1")
+    end
+    if(home_match_code == 8):
+        at_load_m2_wait = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH LOADM2_WAIT")
+    end
+    if(home_match_code == 9):
+        at_unload_m2 = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH UNLOADM2")
+    end
+    if(home_match_code == 10):
+        at_unload_m2_wait = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH UNLOADM2_WAIT")
+    end
+    if(home_match_code == 11):
+        at_air_c2 = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH AIRC2")
+    end
+    if(home_match_code == 12):
+        home_route_door_done = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH DOORC1")
+    end
+    if(home_match_code == 13):
+        home_route_door_done = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH DOORC2")
+    end
+    if(home_match_code == 14):
+        home_route_door_done = 1
+        home_already_home = 1
+        log_message(1,"HOME ACTUAL POSITION MATCH HOMELOCATION")
+    end
+    if(home_match_code == 15):
+        log_message(1,"HOME ACTUAL POSITION MATCH LOADC2")
+    end
+    if(home_match_code == 17):
+        log_message(1,"HOME ACTUAL POSITION IN LOAD_DAOTOOL SEGMENT")
+    end
+    if(home_match_code == 18):
+        log_message(1,"HOME ACTUAL POSITION IN UNLOAD_DAOTOOL SEGMENT")
+    end
+    if(home_match_code == 19):
+        log_message(1,"HOME ACTUAL POSITION IN DROP SEGMENT")
+    end
+else:
+    home_match_code = 0
+    log_message(2,"HOME ACTUAL POSITION NOT IN SPECIAL TOLERANCE")
+end
+# Point recognition has priority. Check the danger region only
+# when the current pose does not match any taught special point.
+if(home_match_valid == 0):
+    if(home_c1_danger_side == 1):
+        log_message(2,"HOME CNC1 DANGER SIDE DETECTED AFTER POINT CHECK")
+        # [CNC36] Danger side: retreat by MoveL to the Wait point of the tool facing the chuck,
+        # then to the Door. Tool identified by J6 (Load ~ +44, Air ~ -45, Unload ~ -135);
+        # thresholds are midpoints of the active taught J6 values. Speed 30 mm/s.
+        home_c1_wait_route = 0
+        if(home_actual_joint[5] >= (p_odd_load_wait[5] + p_odd_air_v1[5]) * 0.5):
+            home_c1_wait_route = 1
+        end
+        if(home_actual_joint[5] <= (p_odd_unload_wait[5] + p_odd_air_v1[5]) * 0.5):
+            home_c1_wait_route = 2
+        end
+        if(home_c1_wait_route == 1):
+            log_message(1,"HOME CNC1 DANGER LOAD TOOL MOVEL C1LOADWAIT START")
+            home_wait_pose = kine_forward(p_odd_load_wait)
+            home_wait_pose = pose_add(home_wait_pose,p_odd_user_x_offset)
+            movl(home_wait_pose,0,30,200,0)
+            at_c1_load_wait = 1
+            home_route_hint = 1
+            log_message(1,"HOME ROUTE C1LOADWAIT COMPLETE")
+        end
+        if(home_c1_wait_route == 2):
+            log_message(1,"HOME CNC1 DANGER UNLOAD TOOL MOVEL C1UNLOADWAIT START")
+            home_wait_pose = kine_forward(p_odd_unload_wait)
+            movl(home_wait_pose,0,30,200,0)
+            at_c1_unload_wait = 1
+            home_route_hint = 1
+            log_message(1,"HOME ROUTE C1UNLOADWAIT COMPLETE")
+        end
+        # Air-blow orientation: back to the air entry point (the air Wait), then straight to the Door.
+        if(home_c1_wait_route == 0):
+            log_message(1,"HOME CNC1 DANGER AIR TOOL MOVEL AIRC1V1 START")
+            home_wait_pose = kine_forward(p_odd_air_v1)
+            movl(home_wait_pose,0,30,200,0)
+            log_message(1,"HOME ROUTE AIRC1V1 COMPLETE")
+            door_c1_keep_j6_joint = get_atl_joint_pose()
+            door_c1_keep_j6_joint[0] = p_odd_door[0]
+            door_c1_keep_j6_joint[1] = p_odd_door[1]
+            door_c1_keep_j6_joint[2] = p_odd_door[2]
+            door_c1_keep_j6_joint[3] = p_odd_door[3]
+            door_c1_keep_j6_joint[4] = p_odd_door[4]
+            door_c1_keep_j6_pose = kine_forward(door_c1_keep_j6_joint)
+            log_message(1,"HOME ROUTE MOVEL DOORC1 KEEP CURRENT J6")
+                movl(door_c1_keep_j6_pose,0,30,200,0)
+            log_message(1,"AT DOORC1 KEEP CURRENT J6 NO ROTATION")
+            home_route_door_done = 1
+            home_route_hint = 1
+            at_c1_load_wait = 0
+            at_c1_load = 0
+            at_c1_load_end = 0
+            at_c1_unload_wait = 0
+            at_c1_unload = 0
+            at_load_m2_wait = 0
+            at_load_m2 = 0
+            at_end_load_m2 = 0
+            at_unload_m2_wait = 0
+            at_unload_m2 = 0
+            at_air_c2 = 0
+            log_message(1,"HOME ROUTE DOORC1 COMPLETE")
+        end
+    end
+end
+if(home_match_valid == 0):
+    # Do not execute the CNC2 escape after the CNC1 escape has
+    # already reached DoorC1, even if the two coarse danger
+    # regions overlap at an unusual robot pose.
+    if(home_route_door_done == 0):
+        if(home_c2_danger_side == 1):
+        log_message(2,"HOME CNC2 DANGER SIDE DETECTED AFTER POINT CHECK")
+        # [CNC36] Danger side: retreat by MoveL to the Wait point of the tool facing the chuck,
+        # then to the Door. Tool identified by J6 (Load ~ +44, Air ~ -45, Unload ~ -135);
+        # thresholds are midpoints of the active taught J6 values. Speed 30 mm/s.
+        home_c2_wait_route = 0
+        if(home_actual_joint[5] >= (p_even_load_wait[5] + p_even_air_v1[5]) * 0.5):
+            home_c2_wait_route = 1
+        end
+        if(home_actual_joint[5] <= (p_even_unload_wait[5] + p_even_air_v1[5]) * 0.5):
+            home_c2_wait_route = 2
+        end
+        if(home_c2_wait_route == 1):
+            log_message(1,"HOME CNC2 DANGER LOAD TOOL MOVEL LOADM2_WAIT START")
+            home_wait_pose = kine_forward(p_even_load_wait)
+            home_wait_pose = pose_add(home_wait_pose,p_even_user_x_offset)
+            movl(home_wait_pose,0,30,200,0)
+            at_load_m2_wait = 1
+            home_route_hint = 2
+            log_message(1,"HOME ROUTE LOADM2_WAIT COMPLETE")
+        end
+        if(home_c2_wait_route == 2):
+            log_message(1,"HOME CNC2 DANGER UNLOAD TOOL MOVEL UNLOADM2_WAIT START")
+            home_wait_pose = kine_forward(p_even_unload_wait)
+            movl(home_wait_pose,0,30,200,0)
+            at_unload_m2_wait = 1
+            home_route_hint = 2
+            log_message(1,"HOME ROUTE UNLOADM2_WAIT COMPLETE")
+        end
+        # Air-blow orientation: back to the air entry point (the air Wait), then straight to the Door.
+        if(home_c2_wait_route == 0):
+            log_message(1,"HOME CNC2 DANGER AIR TOOL MOVEL AIRC2V1 START")
+            home_wait_pose = kine_forward(p_even_air_v1)
+            movl(home_wait_pose,0,30,200,0)
+            log_message(1,"HOME ROUTE AIRC2V1 COMPLETE")
+            door_c2_keep_j6_joint = get_atl_joint_pose()
+            door_c2_keep_j6_joint[0] = p_even_door[0]
+            door_c2_keep_j6_joint[1] = p_even_door[1]
+            door_c2_keep_j6_joint[2] = p_even_door[2]
+            door_c2_keep_j6_joint[3] = p_even_door[3]
+            door_c2_keep_j6_joint[4] = p_even_door[4]
+            door_c2_keep_j6_pose = kine_forward(door_c2_keep_j6_joint)
+            log_message(1,"HOME ROUTE MOVEL DOORC2 KEEP CURRENT J6")
+                movl(door_c2_keep_j6_pose,0,30,200,0)
+            log_message(1,"AT DOORC2 KEEP CURRENT J6 NO ROTATION")
+            home_route_door_done = 1
+            home_route_hint = 2
+            at_c1_load_wait = 0
+            at_c1_load = 0
+            at_c1_load_end = 0
+            at_c1_unload_wait = 0
+            at_c1_unload = 0
+            at_load_m2_wait = 0
+            at_load_m2 = 0
+            at_end_load_m2 = 0
+            at_unload_m2_wait = 0
+            at_unload_m2 = 0
+            at_air_c2 = 0
+                log_message(1,"HOME ROUTE DOORC2 COMPLETE")
+        end
+        end
+    end
+end
+if(at_c1_load_end == 1):
+    log_message(1,"HOME ROUTE CURRENT AT C1LOADEND")
+    log_message(1,"HOME ROUTE MOVEL C1LOAD START")
+    p_c1_load_pose = kine_forward(p_odd_load)
+    p_c1_load_pose = pose_add(p_c1_load_pose,p_odd_user_x_offset)
+    movl(p_c1_load_pose,0,30,200,0)
+    at_c1_load_end = 0
+    at_c1_load = 1
+    home_route_hint = 1
+    log_message(1,"HOME ROUTE C1LOAD COMPLETE")
+end
+if(at_c1_load == 1):
+    log_message(1,"HOME ROUTE CURRENT AT C1LOAD")
+    log_message(1,"HOME ROUTE MOVEL C1LOADWAIT START")
+    p_c1_load_wait_pose = kine_forward(p_odd_load_wait)
+    p_c1_load_wait_pose = pose_add(p_c1_load_wait_pose,p_odd_user_x_offset)
+    movl(p_c1_load_wait_pose,0,speed_movel_fast,3500,0)
+    at_c1_load = 0
+    at_c1_load_wait = 1
+    home_route_hint = 1
+    log_message(1,"HOME ROUTE C1LOADWAIT COMPLETE")
+end
+if(at_c1_load_wait == 1):
+    log_message(1,"HOME ROUTE CURRENT AT C1LOADWAIT")
+    log_message(1,"HOME ROUTE MOVEJ DOORC1 START")
+    door_c1_keep_j6_joint = get_atl_joint_pose()
+    door_c1_keep_j6_joint[0] = p_odd_door[0]
+    door_c1_keep_j6_joint[1] = p_odd_door[1]
+    door_c1_keep_j6_joint[2] = p_odd_door[2]
+    door_c1_keep_j6_joint[3] = p_odd_door[3]
+    door_c1_keep_j6_joint[4] = p_odd_door[4]
+    movj(door_c1_keep_j6_joint,0,speed_movej_fast,720,0)
+    home_route_door_done = 1
+    log_message(1,"HOME ROUTE DOORC1 COMPLETE")
+end
+if(at_c1_unload == 1):
+    log_message(1,"HOME ROUTE CURRENT AT C1UNLOAD")
+    log_message(1,"HOME ROUTE MOVEL C1UNLOADWAIT START")
+    p_c1_unload_wait_pose = kine_forward(p_odd_unload_wait)
+    movl(p_c1_unload_wait_pose,0,speed_movel_fast,3500,0)
+    at_c1_unload = 0
+    at_c1_unload_wait = 1
+    home_route_hint = 1
+    log_message(1,"HOME ROUTE C1UNLOADWAIT COMPLETE")
+end
+if(home_match_code == 16):
+    log_message(1,"HOME ROUTE CURRENT AT C1UNLOADDOWN")
+    log_message(1,"HOME ROUTE MOVEL C1UNLOADDOWN TO C1UNLOADWAIT START")
+    p_c1_unload_wait_pose = kine_forward(p_odd_unload_wait)
+    movl(p_c1_unload_wait_pose,0,speed_movel_fast,3500,0)
+    at_c1_unload_wait = 1
+    home_route_hint = 1
+    log_message(1,"HOME ROUTE C1UNLOADWAIT COMPLETE")
+end
+if(at_c1_unload_wait == 1):
+    log_message(1,"HOME ROUTE CURRENT AT C1UNLOADWAIT")
+    log_message(1,"HOME ROUTE MOVEJ DOORC1 START")
+    door_c1_keep_j6_joint = get_atl_joint_pose()
+    door_c1_keep_j6_joint[0] = p_odd_door[0]
+    door_c1_keep_j6_joint[1] = p_odd_door[1]
+    door_c1_keep_j6_joint[2] = p_odd_door[2]
+    door_c1_keep_j6_joint[3] = p_odd_door[3]
+    door_c1_keep_j6_joint[4] = p_odd_door[4]
+    movj(door_c1_keep_j6_joint,0,speed_movej_fast,720,0)
+    home_route_door_done = 1
+    log_message(1,"HOME ROUTE DOORC1 COMPLETE")
+end
+if(at_end_load_m2 == 1):
+    log_message(1,"HOME ROUTE CURRENT AT ENDLOADM2V2")
+    log_message(1,"HOME ROUTE MOVEL ENDLOADM2V1 START")
+    p_end_load_m2v1_pose = kine_forward(p_even_load_end)
+    p_end_load_m2v1_pose = pose_add(p_end_load_m2v1_pose,p_even_user_x_offset)
+                movl(p_end_load_m2v1_pose,0,30,200,0)
+    at_end_load_m2 = 0
+    at_load_m2 = 1
+    home_route_hint = 2
+    log_message(1,"HOME ROUTE ENDLOADM2V1 COMPLETE")
+end
+if(at_load_m2 == 1):
+    log_message(1,"HOME ROUTE CURRENT AT ENDLOADM2V1")
+    log_message(1,"HOME ROUTE MOVEL LOADM2_WAIT START")
+    p_load_m2_wait_pose = kine_forward(p_even_load_wait)
+    p_load_m2_wait_pose = pose_add(p_load_m2_wait_pose,p_even_user_x_offset)
+    movl(p_load_m2_wait_pose,0,speed_movel_fast,3500,0)
+    at_load_m2 = 0
+    at_load_m2_wait = 1
+    home_route_hint = 2
+    log_message(1,"HOME ROUTE LOADM2_WAIT COMPLETE")
+end
+if(home_match_code == 15):
+    log_message(1,"HOME ROUTE CURRENT AT LOADC2")
+    log_message(1,"HOME ROUTE MOVEL LOADC2 TO LOADM2_WAIT START")
+    p_load_m2_wait_pose = kine_forward(p_even_load_wait)
+    p_load_m2_wait_pose = pose_add(p_load_m2_wait_pose,p_even_user_x_offset)
+    movl(p_load_m2_wait_pose,0,speed_movel_fast,3500,0)
+    at_load_m2_wait = 1
+    home_route_hint = 2
+    log_message(1,"HOME ROUTE LOADM2_WAIT COMPLETE")
+end
+if(at_load_m2_wait == 1):
+    log_message(1,"HOME ROUTE CURRENT AT LOADM2_WAIT")
+    log_message(1,"HOME ROUTE MOVEJ DOORC2 START")
+    door_c2_keep_j6_joint = get_atl_joint_pose()
+    door_c2_keep_j6_joint[0] = p_even_door[0]
+    door_c2_keep_j6_joint[1] = p_even_door[1]
+    door_c2_keep_j6_joint[2] = p_even_door[2]
+    door_c2_keep_j6_joint[3] = p_even_door[3]
+    door_c2_keep_j6_joint[4] = p_even_door[4]
+    movj(door_c2_keep_j6_joint,0,speed_movej_fast,720,0)
+    home_route_door_done = 1
+    log_message(1,"HOME ROUTE DOORC2 COMPLETE")
+end
+if(at_unload_m2 == 1):
+    log_message(1,"HOME ROUTE CURRENT AT UNLOADM2")
+    log_message(1,"HOME ROUTE MOVEL UNLOADM2_WAIT START")
+    p_unload_m2_wait_pose = kine_forward(p_even_unload_wait)
+    movl(p_unload_m2_wait_pose,0,speed_movel_fast,3500,0)
+    at_unload_m2 = 0
+    at_unload_m2_wait = 1
+    home_route_hint = 2
+    log_message(1,"HOME ROUTE UNLOADM2_WAIT COMPLETE")
+end
+if(at_unload_m2_wait == 1):
+    log_message(1,"HOME ROUTE CURRENT AT UNLOADM2_WAIT")
+    log_message(1,"HOME ROUTE MOVEJ DOORC2 START")
+    door_c2_keep_j6_joint = get_atl_joint_pose()
+    door_c2_keep_j6_joint[0] = p_even_door[0]
+    door_c2_keep_j6_joint[1] = p_even_door[1]
+    door_c2_keep_j6_joint[2] = p_even_door[2]
+    door_c2_keep_j6_joint[3] = p_even_door[3]
+    door_c2_keep_j6_joint[4] = p_even_door[4]
+    movj(door_c2_keep_j6_joint,0,speed_movej_fast,720,0)
+    home_route_door_done = 1
+    log_message(1,"HOME ROUTE DOORC2 COMPLETE")
+end
+if(at_air_c2 == 1):
+    log_message(1,"HOME ROUTE CURRENT AT AIRC2")
+    # [CNC36] Retreat AirC2 -> AirC2v1 (reverse of the entry path) before DoorC2.
+    log_message(1,"HOME ROUTE MOVEL AIRC2V1 START")
+    home_wait_pose = kine_forward(p_even_air_v1)
+    movl(home_wait_pose,0,30,200,0)
+    log_message(1,"HOME ROUTE AIRC2V1 COMPLETE")
+    log_message(1,"HOME ROUTE MOVEJ DOORC2 START")
+    door_c2_keep_j6_joint = get_atl_joint_pose()
+    door_c2_keep_j6_joint[0] = p_even_door[0]
+    door_c2_keep_j6_joint[1] = p_even_door[1]
+    door_c2_keep_j6_joint[2] = p_even_door[2]
+    door_c2_keep_j6_joint[3] = p_even_door[3]
+    door_c2_keep_j6_joint[4] = p_even_door[4]
+    movj(door_c2_keep_j6_joint,0,speed_movej_fast,720,0)
+    home_route_door_done = 1
+    at_air_c2 = 0
+    log_message(1,"HOME ROUTE DOORC2 COMPLETE")
+end
+if(home_match_code == 17):
+    log_message(1,"HOME ROUTE LOAD_DAOTOOL SEGMENT TO LOAD_DAOTOOL_WAIT")
+    movj(p_load_daotool_wait,0,speed_movej_fast,720,0)
+    home_route_door_done = 1
+    log_message(1,"HOME ROUTE LOAD_DAOTOOL_WAIT COMPLETE")
+end
+if(home_match_code == 18):
+    log_message(1,"HOME ROUTE UNLOAD_DAOTOOL SEGMENT TO UNLOAD_DAOTOOL_WAIT")
+    movj(p_unload_daotool_wait,0,speed_movej_fast,720,0)
+    home_route_door_done = 1
+    log_message(1,"HOME ROUTE UNLOAD_DAOTOOL_WAIT COMPLETE")
+end
+if(home_match_code == 19):
+    log_message(1,"HOME ROUTE DROP SEGMENT MOVEL STRAIGHT UP TO DROP ABOVE")
+    movl(p_drop_above_pose,0,30,200,0)
+    home_route_door_done = 1
+    log_message(1,"HOME ROUTE DROP ABOVE COMPLETE")
+end
+# AI16 is lower priority than all recognized points and danger regions.
+# It is used only when no route above has already reached a safe point/door.
+if(home_route_door_done == 0):
+    if(ai16_home_door == 1):
+        log_message(1,"HOME AI16 CNC1 CNC3 CNC5 VIA DOORC1")
+        door_c1_keep_j6_joint = get_atl_joint_pose()
+        door_c1_keep_j6_joint[0] = p_odd_door[0]
+        door_c1_keep_j6_joint[1] = p_odd_door[1]
+        door_c1_keep_j6_joint[2] = p_odd_door[2]
+        door_c1_keep_j6_joint[3] = p_odd_door[3]
+        door_c1_keep_j6_joint[4] = p_odd_door[4]
+        movj(door_c1_keep_j6_joint,0,speed_movej_fast,720,0)
+        home_route_door_done = 1
+    end
+    if(ai16_home_door == 2):
+        log_message(1,"HOME AI16 CNC2 CNC4 CNC6 VIA DOORC2")
+        door_c2_keep_j6_joint = get_atl_joint_pose()
+        door_c2_keep_j6_joint[0] = p_even_door[0]
+        door_c2_keep_j6_joint[1] = p_even_door[1]
+        door_c2_keep_j6_joint[2] = p_even_door[2]
+        door_c2_keep_j6_joint[3] = p_even_door[3]
+        door_c2_keep_j6_joint[4] = p_even_door[4]
+        movj(door_c2_keep_j6_joint,0,speed_movej_fast,720,0)
+        home_route_door_done = 1
+    end
+end
+# Fixed route based on the last known robot position group.
+# C1 points always use DoorC1; C2 points always use DoorC2.
+if(home_route_door_done == 0):
+    if(home_route_hint == 1):
+        log_message(1,"HOME POSITION ROUTE CNC1 VIA DOORC1")
+        door_c1_keep_j6_joint = get_atl_joint_pose()
+        door_c1_keep_j6_joint[0] = p_odd_door[0]
+        door_c1_keep_j6_joint[1] = p_odd_door[1]
+        door_c1_keep_j6_joint[2] = p_odd_door[2]
+        door_c1_keep_j6_joint[3] = p_odd_door[3]
+        door_c1_keep_j6_joint[4] = p_odd_door[4]
+        movj(door_c1_keep_j6_joint,0,speed_movej_fast,720,0)
+        home_route_door_done = 1
+    end
+    if(home_route_hint == 2):
+        log_message(1,"HOME POSITION ROUTE CNC2 VIA DOORC2")
+        door_c2_keep_j6_joint = get_atl_joint_pose()
+        door_c2_keep_j6_joint[0] = p_even_door[0]
+        door_c2_keep_j6_joint[1] = p_even_door[1]
+        door_c2_keep_j6_joint[2] = p_even_door[2]
+        door_c2_keep_j6_joint[3] = p_even_door[3]
+        door_c2_keep_j6_joint[4] = p_even_door[4]
+        movj(door_c2_keep_j6_joint,0,speed_movej_fast,720,0)
+        home_route_door_done = 1
+    end
+end
+# Fallback requested by the operator: after checking every
+# special point and both danger regions, an unknown position
+# moves directly to HomeLocation by MoveJ.
+if(home_route_door_done == 0):
+    log_message(2,"HOME NO SPECIAL POINT OR DANGER REGION")
+    log_message(1,"HOME UNKNOWN POSITION MOVEJ HOME DIRECT START")
+    movj(p_home_location,0,speed_movej_fast,720,0)
+    home_route_door_done = 1
+    home_already_home = 1
+    log_message(1,"HOME UNKNOWN POSITION HOMELOCATION COMPLETE")
+end
+if(home_route_door_done == 1):
+    if(home_already_home == 0):
+        log_message(1,"HOME PROCESS MOVEJ HOMELOCATION START")
+        movj(p_home_location,0,speed_movej_fast,720,0)
+        log_message(1,"HOME PROCESS HOMELOCATION COMPLETE")
+    else:
+        log_message(1,"HOME PROCESS ALREADY AT HOMELOCATION")
+    end
+    at_c1_load_wait = 0
+    at_c1_load = 0
+    at_c1_load_end = 0
+    at_c1_unload_wait = 0
+    at_c1_unload = 0
+    at_load_m2_wait = 0
+    at_load_m2 = 0
+    at_end_load_m2 = 0
+    at_unload_m2_wait = 0
+    at_unload_m2 = 0
+    at_air_c2 = 0
+    home_route_hint = 0
+    sleep(0.01)
+    log_message(1,"DO16 ON ROBOT AT HOME WAIT DI90 OFF")
+end
+log_message(1,"SIM DROP HOME TEST END")

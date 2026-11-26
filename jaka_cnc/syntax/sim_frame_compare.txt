@@ -1,0 +1,222 @@
+# !!! SIMULATION ONLY !!! Compare simulated TCP with TCP measured on the real robot.
+# Real values: tool_thanh in usrfr_thanh. Simulation: model Zu5, tool 0 = flange -> expect an offset
+# about the tool length. Robot waits 5 s at each point: read X Y Z on the Manual screen too.
+# FORMULA = get_atl_tcp_pose converted Base -> usrfr_thanh; RAW = get_atl_tcp_pose as returned.
+p_home_location = [-43.100,56.711,106.885,194.140,-264.961,48.660]
+p_pick = [-62.566,144.864,23.441,190.741,-197.648,-45.829]
+p_drop = [-9.049,127.295,101.570,128.230,-234.974,129.924]
+p_door_c1 = [-126.687,83.807,112.098,163.645,-261.426,-44.917]
+p_door_c2 = [82.806,67.797,128.293,165.476,-230.174,-49.001]
+
+log_message(1,"FRAME COMPARE TEST START")
+movj(p_home_location,0,40,720,0)
+log_message(1,"MOVEJ TO PICK - READ XYZ ON SCREEN")
+movj(p_pick,0,40,720,0)
+sleep(5)
+ft_t = get_atl_tcp_pose()
+ft_d = ((0.7056980154 * (ft_t[0] - 345.833) + 0.7085118376 * (ft_t[1] + 489.782) + 0.0011344638 * (ft_t[2] + 136.233)) - 683.786)
+if(ft_d < 2.0 && ft_d > -2.0):
+    log_message(1,"PICK FORMULA X DIFF UNDER 2 MM")
+elif(ft_d < 10.0 && ft_d > -10.0):
+    log_message(1,"PICK FORMULA X DIFF 2 TO 10 MM")
+elif(ft_d < 50.0 && ft_d > -50.0):
+    log_message(1,"PICK FORMULA X DIFF 10 TO 50 MM")
+elif(ft_d < 150.0 && ft_d > -150.0):
+    log_message(1,"PICK FORMULA X DIFF 50 TO 150 MM")
+else:
+    log_message(1,"PICK FORMULA X DIFF OVER 150 MM")
+end
+ft_d = (ft_t[0] - 683.786)
+if(ft_d < 2.0 && ft_d > -2.0):
+    log_message(1,"PICK RAW X DIFF UNDER 2 MM")
+elif(ft_d < 10.0 && ft_d > -10.0):
+    log_message(1,"PICK RAW X DIFF 2 TO 10 MM")
+elif(ft_d < 50.0 && ft_d > -50.0):
+    log_message(1,"PICK RAW X DIFF 10 TO 50 MM")
+elif(ft_d < 150.0 && ft_d > -150.0):
+    log_message(1,"PICK RAW X DIFF 50 TO 150 MM")
+else:
+    log_message(1,"PICK RAW X DIFF OVER 150 MM")
+end
+ft_d = ((-0.7085100607 * (ft_t[0] - 345.833) + 0.7056988446 * (ft_t[1] + 489.782) + -0.0016231544 * (ft_t[2] + 136.233)) - 1237.165)
+if(ft_d < 2.0 && ft_d > -2.0):
+    log_message(1,"PICK FORMULA Y DIFF UNDER 2 MM")
+elif(ft_d < 10.0 && ft_d > -10.0):
+    log_message(1,"PICK FORMULA Y DIFF 2 TO 10 MM")
+elif(ft_d < 50.0 && ft_d > -50.0):
+    log_message(1,"PICK FORMULA Y DIFF 10 TO 50 MM")
+elif(ft_d < 150.0 && ft_d > -150.0):
+    log_message(1,"PICK FORMULA Y DIFF 50 TO 150 MM")
+else:
+    log_message(1,"PICK FORMULA Y DIFF OVER 150 MM")
+end
+ft_d = (ft_t[1] - 1237.165)
+if(ft_d < 2.0 && ft_d > -2.0):
+    log_message(1,"PICK RAW Y DIFF UNDER 2 MM")
+elif(ft_d < 10.0 && ft_d > -10.0):
+    log_message(1,"PICK RAW Y DIFF 2 TO 10 MM")
+elif(ft_d < 50.0 && ft_d > -50.0):
+    log_message(1,"PICK RAW Y DIFF 10 TO 50 MM")
+elif(ft_d < 150.0 && ft_d > -150.0):
+    log_message(1,"PICK RAW Y DIFF 50 TO 150 MM")
+else:
+    log_message(1,"PICK RAW Y DIFF OVER 150 MM")
+end
+ft_d = ((-0.0019506139 * (ft_t[0] - 345.833) + 0.0003416778 * (ft_t[1] + 489.782) + 0.9999980392 * (ft_t[2] + 136.233)) - 330.754)
+if(ft_d < 2.0 && ft_d > -2.0):
+    log_message(1,"PICK FORMULA Z DIFF UNDER 2 MM")
+elif(ft_d < 10.0 && ft_d > -10.0):
+    log_message(1,"PICK FORMULA Z DIFF 2 TO 10 MM")
+elif(ft_d < 50.0 && ft_d > -50.0):
+    log_message(1,"PICK FORMULA Z DIFF 10 TO 50 MM")
+elif(ft_d < 150.0 && ft_d > -150.0):
+    log_message(1,"PICK FORMULA Z DIFF 50 TO 150 MM")
+else:
+    log_message(1,"PICK FORMULA Z DIFF OVER 150 MM")
+end
+ft_d = (ft_t[2] - 330.754)
+if(ft_d < 2.0 && ft_d > -2.0):
+    log_message(1,"PICK RAW Z DIFF UNDER 2 MM")
+elif(ft_d < 10.0 && ft_d > -10.0):
+    log_message(1,"PICK RAW Z DIFF 2 TO 10 MM")
+elif(ft_d < 50.0 && ft_d > -50.0):
+    log_message(1,"PICK RAW Z DIFF 10 TO 50 MM")
+elif(ft_d < 150.0 && ft_d > -150.0):
+    log_message(1,"PICK RAW Z DIFF 50 TO 150 MM")
+else:
+    log_message(1,"PICK RAW Z DIFF OVER 150 MM")
+end
+log_message(1,"MOVEJ TO DROP - READ XYZ ON SCREEN")
+movj(p_drop,0,40,720,0)
+sleep(5)
+ft_t = get_atl_tcp_pose()
+ft_d = ((0.7056980154 * (ft_t[0] - 345.833) + 0.7085118376 * (ft_t[1] + 489.782) + 0.0011344638 * (ft_t[2] + 136.233)) - -112.925)
+if(ft_d < 2.0 && ft_d > -2.0):
+    log_message(1,"DROP FORMULA X DIFF UNDER 2 MM")
+elif(ft_d < 10.0 && ft_d > -10.0):
+    log_message(1,"DROP FORMULA X DIFF 2 TO 10 MM")
+elif(ft_d < 50.0 && ft_d > -50.0):
+    log_message(1,"DROP FORMULA X DIFF 10 TO 50 MM")
+elif(ft_d < 150.0 && ft_d > -150.0):
+    log_message(1,"DROP FORMULA X DIFF 50 TO 150 MM")
+else:
+    log_message(1,"DROP FORMULA X DIFF OVER 150 MM")
+end
+ft_d = (ft_t[0] - -112.925)
+if(ft_d < 2.0 && ft_d > -2.0):
+    log_message(1,"DROP RAW X DIFF UNDER 2 MM")
+elif(ft_d < 10.0 && ft_d > -10.0):
+    log_message(1,"DROP RAW X DIFF 2 TO 10 MM")
+elif(ft_d < 50.0 && ft_d > -50.0):
+    log_message(1,"DROP RAW X DIFF 10 TO 50 MM")
+elif(ft_d < 150.0 && ft_d > -150.0):
+    log_message(1,"DROP RAW X DIFF 50 TO 150 MM")
+else:
+    log_message(1,"DROP RAW X DIFF OVER 150 MM")
+end
+ft_d = ((-0.7085100607 * (ft_t[0] - 345.833) + 0.7056988446 * (ft_t[1] + 489.782) + -0.0016231544 * (ft_t[2] + 136.233)) - 1317.358)
+if(ft_d < 2.0 && ft_d > -2.0):
+    log_message(1,"DROP FORMULA Y DIFF UNDER 2 MM")
+elif(ft_d < 10.0 && ft_d > -10.0):
+    log_message(1,"DROP FORMULA Y DIFF 2 TO 10 MM")
+elif(ft_d < 50.0 && ft_d > -50.0):
+    log_message(1,"DROP FORMULA Y DIFF 10 TO 50 MM")
+elif(ft_d < 150.0 && ft_d > -150.0):
+    log_message(1,"DROP FORMULA Y DIFF 50 TO 150 MM")
+else:
+    log_message(1,"DROP FORMULA Y DIFF OVER 150 MM")
+end
+ft_d = (ft_t[1] - 1317.358)
+if(ft_d < 2.0 && ft_d > -2.0):
+    log_message(1,"DROP RAW Y DIFF UNDER 2 MM")
+elif(ft_d < 10.0 && ft_d > -10.0):
+    log_message(1,"DROP RAW Y DIFF 2 TO 10 MM")
+elif(ft_d < 50.0 && ft_d > -50.0):
+    log_message(1,"DROP RAW Y DIFF 10 TO 50 MM")
+elif(ft_d < 150.0 && ft_d > -150.0):
+    log_message(1,"DROP RAW Y DIFF 50 TO 150 MM")
+else:
+    log_message(1,"DROP RAW Y DIFF OVER 150 MM")
+end
+ft_d = ((-0.0019506139 * (ft_t[0] - 345.833) + 0.0003416778 * (ft_t[1] + 489.782) + 0.9999980392 * (ft_t[2] + 136.233)) - 353.706)
+if(ft_d < 2.0 && ft_d > -2.0):
+    log_message(1,"DROP FORMULA Z DIFF UNDER 2 MM")
+elif(ft_d < 10.0 && ft_d > -10.0):
+    log_message(1,"DROP FORMULA Z DIFF 2 TO 10 MM")
+elif(ft_d < 50.0 && ft_d > -50.0):
+    log_message(1,"DROP FORMULA Z DIFF 10 TO 50 MM")
+elif(ft_d < 150.0 && ft_d > -150.0):
+    log_message(1,"DROP FORMULA Z DIFF 50 TO 150 MM")
+else:
+    log_message(1,"DROP FORMULA Z DIFF OVER 150 MM")
+end
+ft_d = (ft_t[2] - 353.706)
+if(ft_d < 2.0 && ft_d > -2.0):
+    log_message(1,"DROP RAW Z DIFF UNDER 2 MM")
+elif(ft_d < 10.0 && ft_d > -10.0):
+    log_message(1,"DROP RAW Z DIFF 2 TO 10 MM")
+elif(ft_d < 50.0 && ft_d > -50.0):
+    log_message(1,"DROP RAW Z DIFF 10 TO 50 MM")
+elif(ft_d < 150.0 && ft_d > -150.0):
+    log_message(1,"DROP RAW Z DIFF 50 TO 150 MM")
+else:
+    log_message(1,"DROP RAW Z DIFF OVER 150 MM")
+end
+log_message(1,"MOVEJ TO DOORC1 - READ XYZ ON SCREEN")
+movj(p_door_c1,0,40,720,0)
+sleep(5)
+ft_t = get_atl_tcp_pose()
+ft_d = ((0.7056980154 * (ft_t[0] - 345.833) + 0.7085118376 * (ft_t[1] + 489.782) + 0.0011344638 * (ft_t[2] + 136.233)) - 679.362)
+if(ft_d < 2.0 && ft_d > -2.0):
+    log_message(1,"DOORC1 FORMULA X DIFF UNDER 2 MM")
+elif(ft_d < 10.0 && ft_d > -10.0):
+    log_message(1,"DOORC1 FORMULA X DIFF 2 TO 10 MM")
+elif(ft_d < 50.0 && ft_d > -50.0):
+    log_message(1,"DOORC1 FORMULA X DIFF 10 TO 50 MM")
+elif(ft_d < 150.0 && ft_d > -150.0):
+    log_message(1,"DOORC1 FORMULA X DIFF 50 TO 150 MM")
+else:
+    log_message(1,"DOORC1 FORMULA X DIFF OVER 150 MM")
+end
+ft_d = (ft_t[0] - 679.362)
+if(ft_d < 2.0 && ft_d > -2.0):
+    log_message(1,"DOORC1 RAW X DIFF UNDER 2 MM")
+elif(ft_d < 10.0 && ft_d > -10.0):
+    log_message(1,"DOORC1 RAW X DIFF 2 TO 10 MM")
+elif(ft_d < 50.0 && ft_d > -50.0):
+    log_message(1,"DOORC1 RAW X DIFF 10 TO 50 MM")
+elif(ft_d < 150.0 && ft_d > -150.0):
+    log_message(1,"DOORC1 RAW X DIFF 50 TO 150 MM")
+else:
+    log_message(1,"DOORC1 RAW X DIFF OVER 150 MM")
+end
+log_message(1,"MOVEJ TO DOORC2 - READ XYZ ON SCREEN")
+movj(p_door_c2,0,40,720,0)
+sleep(5)
+ft_t = get_atl_tcp_pose()
+ft_d = ((0.7056980154 * (ft_t[0] - 345.833) + 0.7085118376 * (ft_t[1] + 489.782) + 0.0011344638 * (ft_t[2] + 136.233)) - -365.358)
+if(ft_d < 2.0 && ft_d > -2.0):
+    log_message(1,"DOORC2 FORMULA X DIFF UNDER 2 MM")
+elif(ft_d < 10.0 && ft_d > -10.0):
+    log_message(1,"DOORC2 FORMULA X DIFF 2 TO 10 MM")
+elif(ft_d < 50.0 && ft_d > -50.0):
+    log_message(1,"DOORC2 FORMULA X DIFF 10 TO 50 MM")
+elif(ft_d < 150.0 && ft_d > -150.0):
+    log_message(1,"DOORC2 FORMULA X DIFF 50 TO 150 MM")
+else:
+    log_message(1,"DOORC2 FORMULA X DIFF OVER 150 MM")
+end
+ft_d = (ft_t[0] - -365.358)
+if(ft_d < 2.0 && ft_d > -2.0):
+    log_message(1,"DOORC2 RAW X DIFF UNDER 2 MM")
+elif(ft_d < 10.0 && ft_d > -10.0):
+    log_message(1,"DOORC2 RAW X DIFF 2 TO 10 MM")
+elif(ft_d < 50.0 && ft_d > -50.0):
+    log_message(1,"DOORC2 RAW X DIFF 10 TO 50 MM")
+elif(ft_d < 150.0 && ft_d > -150.0):
+    log_message(1,"DOORC2 RAW X DIFF 50 TO 150 MM")
+else:
+    log_message(1,"DOORC2 RAW X DIFF OVER 150 MM")
+end
+movj(p_home_location,0,40,720,0)
+log_message(1,"FRAME COMPARE TEST END")

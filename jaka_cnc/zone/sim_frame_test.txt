@@ -1,0 +1,90 @@
+# !!! SIMULATION ONLY !!! Which frame do get_atl_tcp_pose and kine_forward return?
+# Reference Pick TCP: user frame 7 = [683.8,1237.2,330.8], base = [-48.8,867.9,193.3] (+/-10 mm).
+# Exactly one ATL line and one KINE line should appear after each step; none = unknown frame/tool.
+p_pick = [-62.566,144.864,23.441,190.741,-197.648,-45.829]
+log_message(1,"FRAME TEST START")
+set_tool_id(1)
+set_user_frame_id(7)
+movj(p_pick,0,40,720,0)
+log_message(1,"STEP A TOOL 1 USER FRAME 7")
+ft_t = get_atl_tcp_pose()
+ft_k = kine_forward(p_pick)
+if(ft_t[0] > 673.8):
+    if(ft_t[0] < 693.8):
+        if(ft_t[1] > 1227.2):
+            if(ft_t[1] < 1247.2):
+                log_message(1,"A ATL TCP = USER FRAME 7")
+            end
+        end
+    end
+end
+if(ft_t[0] > -58.8):
+    if(ft_t[0] < -38.8):
+        if(ft_t[1] > 857.9):
+            if(ft_t[1] < 877.9):
+                log_message(1,"A ATL TCP = BASE FRAME")
+            end
+        end
+    end
+end
+if(ft_k[0] > 673.8):
+    if(ft_k[0] < 693.8):
+        if(ft_k[1] > 1227.2):
+            if(ft_k[1] < 1247.2):
+                log_message(1,"A KINE FORWARD = USER FRAME 7")
+            end
+        end
+    end
+end
+if(ft_k[0] > -58.8):
+    if(ft_k[0] < -38.8):
+        if(ft_k[1] > 857.9):
+            if(ft_k[1] < 877.9):
+                log_message(1,"A KINE FORWARD = BASE FRAME")
+            end
+        end
+    end
+end
+set_user_frame_id(0)
+sleep(0.5)
+log_message(1,"STEP B TOOL 1 USER FRAME 0")
+ft_t = get_atl_tcp_pose()
+ft_k = kine_forward(p_pick)
+if(ft_t[0] > 673.8):
+    if(ft_t[0] < 693.8):
+        if(ft_t[1] > 1227.2):
+            if(ft_t[1] < 1247.2):
+                log_message(1,"B ATL TCP = USER FRAME 7")
+            end
+        end
+    end
+end
+if(ft_t[0] > -58.8):
+    if(ft_t[0] < -38.8):
+        if(ft_t[1] > 857.9):
+            if(ft_t[1] < 877.9):
+                log_message(1,"B ATL TCP = BASE FRAME")
+            end
+        end
+    end
+end
+if(ft_k[0] > 673.8):
+    if(ft_k[0] < 693.8):
+        if(ft_k[1] > 1227.2):
+            if(ft_k[1] < 1247.2):
+                log_message(1,"B KINE FORWARD = USER FRAME 7")
+            end
+        end
+    end
+end
+if(ft_k[0] > -58.8):
+    if(ft_k[0] < -38.8):
+        if(ft_k[1] > 857.9):
+            if(ft_k[1] < 877.9):
+                log_message(1,"B KINE FORWARD = BASE FRAME")
+            end
+        end
+    end
+end
+set_user_frame_id(7)
+log_message(1,"FRAME TEST END - USER FRAME 7 TOOL 1 RESTORED")

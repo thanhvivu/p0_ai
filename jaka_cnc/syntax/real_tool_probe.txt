@@ -1,0 +1,31 @@
+# REAL ROBOT SAFE - NO MOTION, NO SETTING CHANGE. Is the running tool = tool_thanh?
+# Program runs in user frame 0 (real_frame_probe). Pick TCP in Base is converted to usrfr_thanh and compared
+# with the teach screen values read with tool_thanh: X 683.786, Y 1237.165.
+# Put it as the first Sub in the same drag-and-drop frame as the main program, run once, read the log.
+probe_p_pick = [-62.566,144.864,23.441,190.741,-197.648,-45.829]
+probe_k = kine_forward(probe_p_pick)
+probe_ex = ((0.7056980154 * (probe_k[0] - 345.833) + 0.7085118376 * (probe_k[1] + 489.782) + 0.0011344638 * (probe_k[2] + 136.233)) - 683.786)
+probe_ey = ((-0.7085100607 * (probe_k[0] - 345.833) + 0.7056988446 * (probe_k[1] + 489.782) - 0.0016231544 * (probe_k[2] + 136.233)) - 1237.165)
+if(probe_ex < 5.0 && probe_ex > -5.0):
+    log_message(1,"TOOLPROBE X DIFF UNDER 5 MM")
+elif(probe_ex < 30.0 && probe_ex > -30.0):
+    log_message(1,"TOOLPROBE X DIFF 5 TO 30 MM")
+elif(probe_ex < 100.0 && probe_ex > -100.0):
+    log_message(1,"TOOLPROBE X DIFF 30 TO 100 MM")
+else:
+    log_message(1,"TOOLPROBE X DIFF OVER 100 MM")
+end
+if(probe_ey < 5.0 && probe_ey > -5.0):
+    log_message(1,"TOOLPROBE Y DIFF UNDER 5 MM")
+elif(probe_ey < 30.0 && probe_ey > -30.0):
+    log_message(1,"TOOLPROBE Y DIFF 5 TO 30 MM")
+elif(probe_ey < 100.0 && probe_ey > -100.0):
+    log_message(1,"TOOLPROBE Y DIFF 30 TO 100 MM")
+else:
+    log_message(1,"TOOLPROBE Y DIFF OVER 100 MM")
+end
+if(probe_ex < 5.0 && probe_ex > -5.0 && probe_ey < 5.0 && probe_ey > -5.0):
+    log_message(1,"TOOLPROBE RUNNING TOOL = TOOL_THANH - ZONE THRESHOLDS VALID")
+else:
+    log_message(1,"TOOLPROBE RUNNING TOOL IS NOT TOOL_THANH - ZONE THRESHOLDS SHIFTED")
+end

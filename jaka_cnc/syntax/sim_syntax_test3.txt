@@ -1,0 +1,61 @@
+# !!! SIMULATION ONLY - no motion !!! Syntax test 3: arithmetic in assignments WRAPPED IN PARENTHESES.
+# Finding 2026-11-19: "j = j + 1" is rejected, "j = (j + 1)" works.
+# The controller stops at the first rejected line: the last "Pn" line tells which form failed.
+log_message(1,"P0 START")
+x = 3.0
+y = 5.0
+j = 0
+log_message(1,"P1 INTEGER INCREMENT IN PARENTHESES")
+j = (j + 1)
+if(j == 1):
+    log_message(1,"P1 PASS")
+end
+log_message(1,"P2 SINGLE ADD IN PARENTHESES")
+z = (x + y)
+if(z > 7.99 && z < 8.01):
+    log_message(1,"P2 PASS")
+end
+log_message(1,"P3 SINGLE MULTIPLY IN PARENTHESES")
+z = (x * 2.0)
+if(z > 5.99 && z < 6.01):
+    log_message(1,"P3 PASS")
+end
+log_message(1,"P4 MULTI STEP EXPRESSION IN PARENTHESES")
+z = (x * 2.0 + y - 1.0)
+if(z > 9.99 && z < 10.01):
+    log_message(1,"P4 PASS")
+end
+log_message(1,"P5 ARRAY ELEMENTS IN EXPRESSION")
+a = [1.0,2.0,3.0,4.0,5.0,6.0]
+w = (a[0] * 2.0 + a[1] / 2.0)
+if(w > 2.99 && w < 3.01):
+    log_message(1,"P5 PASS")
+end
+log_message(1,"P6 USER FRAME X FROM TCP INTO VARIABLE XU")
+t = get_atl_tcp_pose()
+xu = (0.7056980154 * (t[0] - 345.833) + 0.7085118376 * (t[1] + 489.782) + 0.0011344638 * (t[2] + 136.233))
+if(xu - (0.7056980154 * (t[0] - 345.833) + 0.7085118376 * (t[1] + 489.782) + 0.0011344638 * (t[2] + 136.233)) < 0.001 && xu - (0.7056980154 * (t[0] - 345.833) + 0.7085118376 * (t[1] + 489.782) + 0.0011344638 * (t[2] + 136.233)) > -0.001):
+    log_message(1,"P6 PASS XU MATCHES IN IF FORMULA")
+end
+log_message(1,"P7 WHILE COUNTER WITH VARIABLE INDEX")
+j = 0
+s = 0.0
+while(j < 6):
+    s = (s + a[j])
+    j = (j + 1)
+end
+if(s > 20.99 && s < 21.01):
+    log_message(1,"P7 PASS SUM 21")
+end
+log_message(1,"P8 ARRAY ELEMENT ASSIGN WITH ARITHMETIC")
+b = [0.0,0.0,0.0,0.0,0.0,0.0]
+b[2] = (a[2] + 100.0)
+if(b[2] > 102.99 && b[2] < 103.01):
+    log_message(1,"P8 PASS")
+end
+log_message(1,"P9 VARIABLE INDEX INSIDE IF")
+j = 2
+if(a[j] - 3.0 < 0.001 && a[j] - 3.0 > -0.001):
+    log_message(1,"P9 PASS")
+end
+log_message(1,"SYNTAX TEST 3 END")
