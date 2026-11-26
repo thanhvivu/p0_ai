@@ -35,6 +35,7 @@ Branch: `claude/robot-cnc-code-analysis-ji9l5h`.
 - Test 2 bản 24 phép thử (19–24: vùng nguy hiểm qua Wait) chưa chạy lại trong Simulation (máy thật đã OK).
 
 ## Quyết định đã chốt (lý do)
+- **Chỉ tạo file test Simulation khi người dùng yêu cầu** (2026-11-26); hiện test trực tiếp trên robot thật.
 - Teach điểm bằng góc khớp; MoveL luôn qua cặp `kine_forward` + `movl` (đúng với mọi tool/user frame).
 - Thả hàng = file riêng, P7 làm trigger (không đụng bản cnc36 đang chạy).
 - Chưa rút gọn `jamaguchi_cnc36.txt` (đang chạy ổn; ưu tiên drop test). Ước giảm được ~400–500 dòng.
