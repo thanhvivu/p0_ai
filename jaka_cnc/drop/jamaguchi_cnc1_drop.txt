@@ -83,9 +83,9 @@ p_c6_user_x_offset = [0.0,0,0.0,0,0,0]
 
 # ===== TAUGHT JOINT POINTS =====
 # pickwwait - taught joint point from CobotStudio
-p_pick_true_axis = [-62.562,148.695,10.785,199.567,-197.644,-45.829]
+p_pick_true_axis = [-62.955,153.356,0.661,205.147,-198.542,-47.273]
 # pick - taught joint point from CobotStudio
-p_pick = [-62.566,144.864,23.441,190.741,-197.648,-45.829]
+p_pick = [-62.988,145.634,22.030,191.501,-198.575,-47.272]
 # HomeLocation - copied from CobotStudio Position Variable
 p_home_location = [-43.100,56.711,106.885,194.140,-264.961,48.660]
 
@@ -116,31 +116,36 @@ p_air_c1v1 = [-134.312, 136.943, 45.580, 177.004, -269.190, -44.856]
 p_air_c2 = [55.659,126.993,65.379,166.557,-258.042,-47.170]
 # AirC2v1 = taught joint point from CobotStudio screenshot
 p_air_c2v1 = [56.198,122.439,71.850,164.637,-257.503,-47.180]
-# Updated taught positions for CNC1 Load. - [CNC36] C1Load/C1LoadWait/C1LoadEnd re-taught 2026-11-17
-p_c1_load = [-132.986,139.577,40.211,180.850,-267.475,44.088]
-p_c1_load_wait = [-138.586,142.271,35.057,183.311,-273.075,44.026]
-p_c1_load_end = [-132.739,139.496,40.365,180.778,-267.228,44.091]
+# Updated taught positions for CNC1 Load. - [CNC36] re-taught 2026-11-26 with TCP Load_Tron (round head)
+p_c1_load = [-133.226,140.148,39.140,181.366,-267.073,44.109]
+p_c1_load_wait = [-136.904,141.578,36.301,182.774,-270.750,44.067]
+p_c1_load_end = [-132.915,140.059,39.318,181.277,-266.762,44.112]
 
 # Process 2 Case 2 - Unload CNC1, J6 = original J6 + 180 degrees
-p_c1_unload_wait = [-138.163,142.907,33.696,184.325,-275.438,-135.035]
-p_c1_unload = [-133.563,140.802,37.750,182.372,-270.839,-134.961]
-# C1UnloadDown - retreat point after DI64 clamp confirmation
-p_c1_unload_down = [-133.561,140.586,38.163,182.176,-270.837,-134.961]
+p_c1_unload_wait = [-138.024,143.229,32.752,184.947,-274.933,-136.083]
+p_c1_unload = [-134.015,140.941,37.268,182.715,-271.290,-136.023]
+# C1UnloadDown - [CNC36] 2026-11-26: set EQUAL to C1Unload (no separate down move; MoveL of 0 mm)
+p_c1_unload_down = [-134.015,140.941,37.268,182.715,-271.290,-136.023]
 
-# Process 2 Case 3 - Load CNC2 (model 2 taught positions) - [CNC36] LoadM2_Wait/LoadC2/EndLoadM2v1 re-taught 2026-11
-p_load_m2_wait = [50.754,126.156,66.822,165.907,-262.992,44.342]
+# Process 2 Case 3 - Load CNC2 (model 2 taught positions) - [CNC36] 2026-11-26: LoadM2_Wait/LoadC2/EndLoadM2v1 = SQUARE head set (TCP Load_vuong)
+p_load_m2_wait = [51.875,125.469,65.840,169.996,-261.814,44.043]
 # LoadC2: release Tool Load before entering EndLoadM2v1
-p_load_c2 = [56.882,125.825,67.368,165.670,-256.865,44.220]
+p_load_c2 = [57.542,125.553,65.891,169.886,-256.149,44.176]
 # EndLoadM2v1 - updated from the latest taught position.
-p_end_load_m2v1 = [57.156,125.834,67.352,165.676,-256.592,44.214]
+p_end_load_m2v1 = [57.997,125.599,65.829,169.904,-255.694,44.187]
 p_end_load_m2v2 = [57.088,126.289,65.170,169.400,-256.938,44.672]
 # EndLoadM2v1/v2 are retained for Home recognition only while Case 3 is simplified.
 # Relative Cartesian retreat after loading even-numbered CNC: X -20 mm in user frame
 
 # Process 2 Case 4 - Unload CNC2, J6 = original J6 + 180 degrees
-p_unload_m2_wait = [51.507,126.321,64.645,170.483,-262.240,-135.484]
-p_unload_m2 = [57.266,126.106,64.997,170.375,-256.483,-135.334]
+p_unload_m2_wait = [51.577,126.387,64.435,170.628,-262.170,-135.482]
+p_unload_m2 = [57.882,126.213,64.715,170.554,-255.866,-135.318]
 
+# ===== [CNC36] SPARE: CNC2 load points for the ROUND head (TCP Load_Tron), taught 2026-11-26 =====
+# Not used now (CNC2 is loaded with the square head). Kept for a future product/model selection.
+p_c2_tron_load_wait = [51.981,126.155,66.601,166.126,-261.765,44.318]
+p_c2_tron_load = [57.453,126.223,66.572,166.066,-256.294,44.208]
+p_c2_tron_load_end = [57.814,126.257,66.520,166.082,-255.933,44.201]
 # ===== [CNC36] CNC3..CNC6 TAUGHT POINTS =====
 # The robot base rides on Axis1 (moved by PLC): Pos1 = CNC1/2, Pos2 = CNC3/4, Pos3 = CNC5/6.
 # Joint points are relative to the robot base. If Axis1 stops at exactly the same relative
@@ -164,17 +169,17 @@ p_c3_air_v1 = [-134.312, 136.943, 45.580, 177.004, -269.190, -44.856]
 # copy of p_air_switch_tool
 p_c3_air_switch_tool = [-134.333,142.075,36.696,180.755,-269.211,-44.855]
 # copy of p_c1_load_wait
-p_c3_load_wait = [-138.586,142.271,35.057,183.311,-273.075,44.026]
+p_c3_load_wait = [-136.904,141.578,36.301,182.774,-270.750,44.067]
 # copy of p_c1_load
-p_c3_load = [-132.986,139.577,40.211,180.850,-267.475,44.088]
+p_c3_load = [-133.226,140.148,39.140,181.366,-267.073,44.109]
 # copy of p_c1_load_end
-p_c3_load_end = [-132.739,139.496,40.365,180.778,-267.228,44.091]
+p_c3_load_end = [-132.915,140.059,39.318,181.277,-266.762,44.112]
 # copy of p_c1_unload_wait
-p_c3_unload_wait = [-138.163,142.907,33.696,184.325,-275.438,-135.035]
+p_c3_unload_wait = [-138.024,143.229,32.752,184.947,-274.933,-136.083]
 # copy of p_c1_unload
-p_c3_unload = [-133.563,140.802,37.750,182.372,-270.839,-134.961]
+p_c3_unload = [-134.015,140.941,37.268,182.715,-271.290,-136.023]
 # copy of p_c1_unload_down
-p_c3_unload_down = [-133.561,140.586,38.163,182.176,-270.837,-134.961]
+p_c3_unload_down = [-134.015,140.941,37.268,182.715,-271.290,-136.023]
 
 # CNC4 (P3 Case3/Case4, even side like CNC2) - PLACEHOLDER
 # copy of p_air_c2v1
@@ -182,15 +187,15 @@ p_c4_air_v1 = [56.198,122.439,71.850,164.637,-257.503,-47.180]
 # copy of p_air_c2
 p_c4_air = [55.659,126.993,65.379,166.557,-258.042,-47.170]
 # copy of p_load_m2_wait
-p_c4_load_wait = [50.754,126.156,66.822,165.907,-262.992,44.342]
+p_c4_load_wait = [51.875,125.469,65.840,169.996,-261.814,44.043]
 # copy of p_load_c2
-p_c4_load = [56.882,125.825,67.368,165.670,-256.865,44.220]
+p_c4_load = [57.542,125.553,65.891,169.886,-256.149,44.176]
 # copy of p_end_load_m2v1
-p_c4_load_end = [57.156,125.834,67.352,165.676,-256.592,44.214]
+p_c4_load_end = [57.997,125.599,65.829,169.904,-255.694,44.187]
 # copy of p_unload_m2_wait
-p_c4_unload_wait = [51.507,126.321,64.645,170.483,-262.240,-135.484]
+p_c4_unload_wait = [51.577,126.387,64.435,170.628,-262.170,-135.482]
 # copy of p_unload_m2
-p_c4_unload = [57.266,126.106,64.997,170.375,-256.483,-135.334]
+p_c4_unload = [57.882,126.213,64.715,170.554,-255.866,-135.318]
 
 # CNC5 (P4 Case1/Case2, odd side like CNC1) - PLACEHOLDER
 # copy of p_air_c1v1
@@ -198,17 +203,17 @@ p_c5_air_v1 = [-134.312, 136.943, 45.580, 177.004, -269.190, -44.856]
 # copy of p_air_switch_tool
 p_c5_air_switch_tool = [-134.333,142.075,36.696,180.755,-269.211,-44.855]
 # copy of p_c1_load_wait
-p_c5_load_wait = [-138.586,142.271,35.057,183.311,-273.075,44.026]
+p_c5_load_wait = [-136.904,141.578,36.301,182.774,-270.750,44.067]
 # copy of p_c1_load
-p_c5_load = [-132.986,139.577,40.211,180.850,-267.475,44.088]
+p_c5_load = [-133.226,140.148,39.140,181.366,-267.073,44.109]
 # copy of p_c1_load_end
-p_c5_load_end = [-132.739,139.496,40.365,180.778,-267.228,44.091]
+p_c5_load_end = [-132.915,140.059,39.318,181.277,-266.762,44.112]
 # copy of p_c1_unload_wait
-p_c5_unload_wait = [-138.163,142.907,33.696,184.325,-275.438,-135.035]
+p_c5_unload_wait = [-138.024,143.229,32.752,184.947,-274.933,-136.083]
 # copy of p_c1_unload
-p_c5_unload = [-133.563,140.802,37.750,182.372,-270.839,-134.961]
+p_c5_unload = [-134.015,140.941,37.268,182.715,-271.290,-136.023]
 # copy of p_c1_unload_down
-p_c5_unload_down = [-133.561,140.586,38.163,182.176,-270.837,-134.961]
+p_c5_unload_down = [-134.015,140.941,37.268,182.715,-271.290,-136.023]
 
 # CNC6 (P4 Case3/Case4, even side like CNC2) - PLACEHOLDER
 # copy of p_air_c2v1
@@ -216,15 +221,15 @@ p_c6_air_v1 = [56.198,122.439,71.850,164.637,-257.503,-47.180]
 # copy of p_air_c2
 p_c6_air = [55.659,126.993,65.379,166.557,-258.042,-47.170]
 # copy of p_load_m2_wait
-p_c6_load_wait = [50.754,126.156,66.822,165.907,-262.992,44.342]
+p_c6_load_wait = [51.875,125.469,65.840,169.996,-261.814,44.043]
 # copy of p_load_c2
-p_c6_load = [56.882,125.825,67.368,165.670,-256.865,44.220]
+p_c6_load = [57.542,125.553,65.891,169.886,-256.149,44.176]
 # copy of p_end_load_m2v1
-p_c6_load_end = [57.156,125.834,67.352,165.676,-256.592,44.214]
+p_c6_load_end = [57.997,125.599,65.829,169.904,-255.694,44.187]
 # copy of p_unload_m2_wait
-p_c6_unload_wait = [51.507,126.321,64.645,170.483,-262.240,-135.484]
+p_c6_unload_wait = [51.577,126.387,64.435,170.628,-262.170,-135.482]
 # copy of p_unload_m2
-p_c6_unload = [57.266,126.106,64.997,170.375,-256.483,-135.334]
+p_c6_unload = [57.882,126.213,64.715,170.554,-255.866,-135.318]
 
 # ===== [CNC36] ACTIVE CNC POINT SET =====
 # Case motion (cnc_motion_case 29..32) and DI90 Home recovery use only p_odd_* / p_even_*.
@@ -322,18 +327,18 @@ p_drop_above_pose = pose_add(p_drop_pose,p_drop_up_offset)
 p_drop_above_joint = kine_inverse(p_drop,p_drop_above_pose)
 home_j = 0
 
-# Process 8 Case 1 - Change Tool - [CNC36] Load_daotool_Wait/Load_daotool re-taught 2026-11 (Z 355.4 -> 325.4)
-p_load_daotool_wait = [-5.321,90.910,100.547,165.270,-140.056,-48.007]
-p_load_daotool = [-5.320,91.879,104.347,160.501,-140.055,-48.007]
+# Process 8 Case 1 - Change Tool - [CNC36] 2026-11-26: Load_daotool* taught with TCP Load_vuong (62.4 mm descent), unload_daotool re-taught
+p_load_daotool_wait = [-4.269,92.626,96.069,174.039,-139.051,-43.430]
+p_load_daotool = [-4.267,94.590,103.932,164.212,-139.049,-43.430]
 p_trunggian_unload = [-13.614,106.581,53.951,195.463,-148.333,-48.906]
 p_unload_daotool_wait = [-53.210,77.391,102.652,91.290,-89.672,-323.161]
-p_unload_daotool = [-53.520,77.575,108.245,85.260,-89.523,-323.554]
+p_unload_daotool = [-53.447,77.544,108.268,85.268,-89.522,-323.481]
 # Joint envelopes for DI90 Home recognition along each tool-change segment.
 # Each envelope covers both endpoints plus the same +/-5 degree tolerance.
-p_load_daotool_segment_min = [-10.321,85.910,95.547,155.501,-145.056,-53.007]
-p_load_daotool_segment_max = [-0.320,96.879,109.347,170.270,-135.055,-43.007]
-p_unload_daotool_segment_min = [-58.520,72.391,97.652,80.260,-94.672,-328.554]
-p_unload_daotool_segment_max = [-48.210,82.575,113.245,96.290,-84.523,-318.161]
+p_load_daotool_segment_min = [-9.269,87.626,91.069,159.212,-144.051,-48.430]
+p_load_daotool_segment_max = [0.733,99.590,108.932,179.039,-134.049,-38.430]
+p_unload_daotool_segment_min = [-58.447,72.391,97.652,80.268,-94.672,-328.481]
+p_unload_daotool_segment_max = [-48.210,82.544,113.268,96.290,-84.522,-318.161]
 
 # Precomputed joint limits for Home route recognition.
 # These literal arrays avoid arithmetic assignments, which this controller rejects.
@@ -3083,8 +3088,10 @@ while(1):
                                     movj(p_unload_daotool_wait,0,speed_movej_fast,720,10)
                                     log_message(1,"P8C1 UNLOAD_DAOTOOL_WAIT COMPLETE")
 
-                                    log_message(1,"P8C1 MOVEJ UNLOAD_DAOTOOL START")
-                                    movj(p_unload_daotool,0,speed_movej,200,0)
+                                    log_message(1,"P8C1 MOVEL UNLOAD_DAOTOOL START")
+                                    # [CNC36] Straight 36.2 mm descent: MoveL (was MoveJ).
+                                    p_unload_daotool_pose = kine_forward(p_unload_daotool)
+                                    movl(p_unload_daotool_pose,0,speed_movel,200,0)
                                     log_message(1,"P8C1 UNLOAD_DAOTOOL COMPLETE")
 
                                     set_digital_output(4,65,1,1)
@@ -3110,8 +3117,10 @@ while(1):
 
                                     if(case_motion_ok == 1):
                                         log_message(1,"P8C1 DI65 ON DO65 OFF UNCLAMP COMPLETE")
-                                        log_message(1,"P8C1 RETURN UNLOAD_DAOTOOL_WAIT START")
-                                        movj(p_unload_daotool_wait,0,speed_movej_fast,720,10)
+                                        log_message(1,"P8C1 MOVEL RETURN UNLOAD_DAOTOOL_WAIT START")
+                                        # [CNC36] Straight 36.2 mm lift: MoveL (was MoveJ).
+                                        p_unload_daotool_wait_pose = kine_forward(p_unload_daotool_wait)
+                                        movl(p_unload_daotool_wait_pose,0,speed_movel_fast,3500,0)
                                         log_message(1,"P8C1 RETURN WAIT COMPLETE")
                                         log_message(1,"P8C1 MOVEJ TRUNGGIAN_UNLOAD START")
                                         movj(p_trunggian_unload,0,speed_movej_fast,720,10)
@@ -3120,7 +3129,7 @@ while(1):
                                         movj(p_load_daotool_wait,0,speed_movej_fast,720,10)
                                         log_message(1,"P8C1 LOAD_DAOTOOL_WAIT COMPLETE")
                                         log_message(1,"P8C1 MOVEL LOAD_DAOTOOL START")
-                                        # [CNC36] Straight 30 mm descent: MoveL (was MoveJ). Joint point -> TCP pose by kine_forward.
+                                        # [CNC36] Straight 62.4 mm descent: MoveL (was MoveJ). Joint point -> TCP pose by kine_forward.
                                         p_load_daotool_pose = kine_forward(p_load_daotool)
                                         movl(p_load_daotool_pose,0,speed_movel,200,0)
                                         log_message(1,"P8C1 LOAD_DAOTOOL COMPLETE")
@@ -3149,8 +3158,10 @@ while(1):
 
                                     if(case_motion_ok == 1):
                                         log_message(1,"P8C1 DI67 ON DO67 OFF UNCLAMP COMPLETE")
-                                        log_message(1,"P8C1 RETURN LOAD_DAOTOOL_WAIT START")
-                                        movj(p_load_daotool_wait,0,speed_movej_fast,720,10)
+                                        log_message(1,"P8C1 MOVEL RETURN LOAD_DAOTOOL_WAIT START")
+                                        # [CNC36] Straight 62.4 mm lift: MoveL (was MoveJ).
+                                        p_load_daotool_wait_pose = kine_forward(p_load_daotool_wait)
+                                        movl(p_load_daotool_wait_pose,0,speed_movel_fast,3500,0)
                                         log_message(1,"P8C1 RETURN LOAD_DAOTOOL_WAIT COMPLETE")
                                         log_message(1,"P8C1 MOVEJ HOMELOCATION START")
                                         movj(p_home_location,0,speed_movej_fast,720,0)

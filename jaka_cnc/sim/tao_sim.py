@@ -97,7 +97,7 @@ m=WARN+['# SIM TEST 1: Case 29..32 (Load/Unload odd and even CNC) for pair 1, 2,
 
 # ---------- 2. Home recovery ----------
 tests=[('p_c1_load_end',1,'C1LOADEND'),('p_c1_load',1,'C1LOAD'),('p_c1_load_wait',1,'C1LOADWAIT'),
-('p_c1_unload',1,'C1UNLOAD'),('p_c1_unload_wait',1,'C1UNLOADWAIT'),('p_c1_unload_down',1,'C1UNLOADDOWN'),
+('p_c1_unload',1,'C1UNLOAD'),('p_c1_unload_wait',1,'C1UNLOADWAIT'),('p_c1_unload_down',1,'C1UNLOAD - DOWN POINT EQUALS UNLOAD POINT'),
 ('p_end_load_m2v1',2,'ENDLOADM2V1'),('p_load_c2',2,'LOADC2'),('p_load_m2_wait',2,'LOADM2_WAIT'),
 ('p_unload_m2',2,'UNLOADM2'),('p_unload_m2_wait',2,'UNLOADM2_WAIT'),('p_air_c2',2,'AIRC2'),
 ('p_door_c1',1,'DOORC1'),('p_door_c2',2,'DOORC2'),

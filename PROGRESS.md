@@ -1,4 +1,4 @@
-# PROGRESS – JAKA cobot nạp phôi 6 máy CNC (cập nhật 2026-11-22)
+# PROGRESS – JAKA cobot nạp phôi 6 máy CNC (cập nhật 2026-11-26)
 
 Chi tiết kỹ thuật, kết quả test, checklist: `jaka_cnc/PHAN_TICH.md` (mục 1–24).
 Branch: `claude/robot-cnc-code-analysis-ji9l5h`.
@@ -25,6 +25,9 @@ Branch: `claude/robot-cnc-code-analysis-ji9l5h`.
 - Drop program: P7 Case DI53 = Home → trên cao (+100 Z) → MoveL xuống → DO65/DI65 → nhấc → Home; Home nhận
   diện đoạn điểm thả bằng vòng `while` 6 khớp. Điểm thả teach: `[-9.049,127.295,101.570,128.230,-234.974,129.924]`.
 - zone_monitor (DO56 lẻ, DO57 chẵn, DO58 Pick), đã rút gọn (57 dòng), chạy dạng Sub-thread1 trong khung kéo thả.
+
+- 2026-11-26: bộ điểm mới + Tool Load tròn/vuông (PHAN_TICH mục 25) đã đưa vào cnc36 qua `tools/build_cnc36.py`;
+  P8 3 đoạn thẳng → MoveL; sinh lại sim/drop/zone. **Chưa test** (Simulation + máy thật).
 
 ## Đang làm dở
 - **Ưu tiên 1: chạy thật chương trình thả hàng** theo checklist `PHAN_TICH.md` mục 22 (chưa có kết quả).
@@ -60,7 +63,8 @@ Branch: `claude/robot-cnc-code-analysis-ji9l5h`.
 - Không đọc được www.jaka.com từ môi trường cloud → tài liệu lệnh do người dùng chụp gửi.
 
 ## Bước tiếp theo
-1. Chạy thật drop program (`PHAN_TICH.md` mục 22), gửi log.
+1. Test bản 2026-11-26: Simulation Test 1/2/3 → máy thật P1, P2 (CNC1 tròn, CNC2 vuông), P8 ở tốc độ thấp.
+1b. Chạy thật drop program (`PHAN_TICH.md` mục 22), gửi log.
 2. Đo với tool 0 + usrfr_thanh: X DoorC1, X DoorC2, Y Pick → cập nhật ngưỡng `zone/tao_zone.py`
    (hoặc chọn đặt `set_tool_id(1)` đầu chương trình – phải test lại toàn chu trình).
 3. PLC map DO56–DO58; chạy zone_monitor thật.

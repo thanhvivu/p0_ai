@@ -2,37 +2,60 @@ import re, sys
 src, dst = sys.argv[1], sys.argv[2]
 L = open(src).read().split('\n')   # LF-normalized original
 def ln(n): return L[n-1]
-NEW2={120:('p_load_m2_wait = [50.293,126.775,63.817,171.018,-264.506,44.650]','p_load_m2_wait = [50.754,126.156,66.822,165.907,-262.992,44.342]'),
-      122:('p_load_c2 = [56.589,126.376,64.481,170.780,-258.211,44.831]','p_load_c2 = [56.882,125.825,67.368,165.670,-256.865,44.220]'),
-      124:('p_end_load_m2v1 = [56.678,126.378,64.477,170.783,-258.123,44.833]','p_end_load_m2v1 = [57.156,125.834,67.352,165.676,-256.592,44.214]')}
+NEW2={120:('p_load_m2_wait = [50.293,126.775,63.817,171.018,-264.506,44.650]','p_load_m2_wait = [51.875,125.469,65.840,169.996,-261.814,44.043]'),
+      122:('p_load_c2 = [56.589,126.376,64.481,170.780,-258.211,44.831]','p_load_c2 = [57.542,125.553,65.891,169.886,-256.149,44.176]'),
+      124:('p_end_load_m2v1 = [56.678,126.378,64.477,170.783,-258.123,44.833]','p_end_load_m2v1 = [57.997,125.599,65.829,169.904,-255.694,44.187]')}
 for n,(o,nw) in NEW2.items():
     assert L[n-1].strip()==o,(n,L[n-1]); L[n-1]=nw
 # ---- [CNC36] P8: Load_daotool points re-taught 2026-11 + MoveL Wait -> Load_daotool ----
-P8={145:('p_load_daotool_wait = [-5.425,91.023,100.495,165.202,-140.160,-48.016]','p_load_daotool_wait = [-5.321,90.910,100.547,165.270,-140.056,-48.007]'),
-    146:('p_load_daotool = [-5.425,91.909,104.011,160.800,-140.159,-48.016]','p_load_daotool = [-5.320,91.879,104.347,160.501,-140.055,-48.007]'),
-    152:('p_load_daotool_segment_min = [-10.425,86.023,95.495,155.800,-145.160,-53.016]','p_load_daotool_segment_min = [-10.321,85.910,95.547,155.501,-145.056,-53.007]'),
-    153:('p_load_daotool_segment_max = [-0.425,96.909,109.011,170.202,-135.159,-43.016]','p_load_daotool_segment_max = [-0.320,96.879,109.347,170.270,-135.055,-43.007]')}
+P8={145:('p_load_daotool_wait = [-5.425,91.023,100.495,165.202,-140.160,-48.016]','p_load_daotool_wait = [-4.269,92.626,96.069,174.039,-139.051,-43.430]'),
+    146:('p_load_daotool = [-5.425,91.909,104.011,160.800,-140.159,-48.016]','p_load_daotool = [-4.267,94.590,103.932,164.212,-139.049,-43.430]'),
+    149:('p_unload_daotool = [-53.520,77.575,108.245,85.260,-89.523,-323.554]','p_unload_daotool = [-53.447,77.544,108.268,85.268,-89.522,-323.481]'),
+    154:('p_unload_daotool_segment_min = [-58.520,72.391,97.652,80.260,-94.672,-328.554]','p_unload_daotool_segment_min = [-58.447,72.391,97.652,80.268,-94.672,-328.481]'),
+    155:('p_unload_daotool_segment_max = [-48.210,82.575,113.245,96.290,-84.523,-318.161]','p_unload_daotool_segment_max = [-48.210,82.544,113.268,96.290,-84.522,-318.161]'),
+    152:('p_load_daotool_segment_min = [-10.425,86.023,95.495,155.800,-145.160,-53.016]','p_load_daotool_segment_min = [-9.269,87.626,91.069,159.212,-144.051,-48.430]'),
+    153:('p_load_daotool_segment_max = [-0.425,96.909,109.011,170.202,-135.159,-43.016]','p_load_daotool_segment_max = [0.733,99.590,108.932,179.039,-134.049,-38.430]')}
 for n,(o,nw) in P8.items():
     assert L[n-1].strip()==o,(n,L[n-1]); L[n-1]=nw
+T26={75:('p_pick_true_axis = [-62.562,148.695,10.785,199.567,-197.644,-45.829]','p_pick_true_axis = [-62.955,153.356,0.661,205.147,-198.542,-47.273]'),
+     77:('p_pick = [-62.566,144.864,23.441,190.741,-197.648,-45.829]','p_pick = [-62.988,145.634,22.030,191.501,-198.575,-47.272]'),
+     114:('p_c1_unload_wait = [-138.163,142.907,33.696,184.325,-275.438,-135.035]','p_c1_unload_wait = [-138.024,143.229,32.752,184.947,-274.933,-136.083]'),
+     115:('p_c1_unload = [-133.563,140.802,37.750,182.372,-270.839,-134.961]','p_c1_unload = [-134.015,140.941,37.268,182.715,-271.290,-136.023]'),
+     117:('p_c1_unload_down = [-133.561,140.586,38.163,182.176,-270.837,-134.961]','p_c1_unload_down = [-134.015,140.941,37.268,182.715,-271.290,-136.023]'),
+     130:('p_unload_m2_wait = [51.507,126.321,64.645,170.483,-262.240,-135.484]','p_unload_m2_wait = [51.577,126.387,64.435,170.628,-262.170,-135.482]'),
+     131:('p_unload_m2 = [57.266,126.106,64.997,170.375,-256.483,-135.334]','p_unload_m2 = [57.882,126.213,64.715,170.554,-255.866,-135.318]')}
+for n,(o,nw) in T26.items():
+    assert L[n-1].strip()==o,(n,L[n-1]); L[n-1]=nw
+assert L[115].startswith('# C1UnloadDown')
+L[115] = '# C1UnloadDown - [CNC36] 2026-11-26: set EQUAL to C1Unload (no separate down move; MoveL of 0 mm)'
 assert L[143].startswith('# Process 8 Case 1 - Change Tool'), L[143]
-L[143] = L[143] + ' - [CNC36] Load_daotool_Wait/Load_daotool re-taught 2026-11 (Z 355.4 -> 325.4)'
+L[143] = L[143] + ' - [CNC36] 2026-11-26: Load_daotool* taught with TCP Load_vuong (62.4 mm descent), unload_daotool re-taught'
+def to_movl(idx,point,old_log,new_log,vel,acc,tol,note):
+    assert L[idx].strip()=='movj(%s,'%point+L[idx].strip().split(',',1)[1], L[idx]
+    assert L[idx-1].strip()==old_log,(idx,L[idx-1])
+    ind=L[idx][:len(L[idx])-len(L[idx].lstrip())]
+    L[idx-1]=ind+new_log
+    L[idx:idx+1]=[ind+'# [CNC36] '+note,ind+'%s_pose = kine_forward(%s)'%(point,point),ind+'movl(%s_pose,0,%s,%s,%s)'%(point,vel,acc,tol)]
+to_movl(2681,'p_load_daotool_wait','log_message(1,"P8C1 RETURN LOAD_DAOTOOL_WAIT START")','log_message(1,"P8C1 MOVEL RETURN LOAD_DAOTOOL_WAIT START")','speed_movel_fast',3500,0,'Straight 62.4 mm lift: MoveL (was MoveJ).')
 assert L[2653].strip()=='movj(p_load_daotool,0,speed_movej,200,0)', L[2653]
 assert L[2652].strip()=='log_message(1,"P8C1 MOVEJ LOAD_DAOTOOL START")'
 ind=L[2653][:len(L[2653])-len(L[2653].lstrip())]
 L[2652]=ind+'log_message(1,"P8C1 MOVEL LOAD_DAOTOOL START")'
 # 1 line -> 3 lines; all later build steps reference lines < 2653, so the shift is harmless
-L[2653:2654]=[ind+'# [CNC36] Straight 30 mm descent: MoveL (was MoveJ). Joint point -> TCP pose by kine_forward.',
+L[2653:2654]=[ind+'# [CNC36] Straight 62.4 mm descent: MoveL (was MoveJ). Joint point -> TCP pose by kine_forward.',
               ind+'p_load_daotool_pose = kine_forward(p_load_daotool)',
               ind+'movl(p_load_daotool_pose,0,speed_movel,200,0)']
-C1N={109:('p_c1_load = [-132.924,140.231,37.879,184.079,-267.412,44.142]','p_c1_load = [-132.986,139.577,40.211,180.850,-267.475,44.088]'),
-     110:('p_c1_load_wait = [-138.586,143.111,32.339,186.740,-273.070,43.926]','p_c1_load_wait = [-138.586,142.271,35.057,183.311,-273.075,44.026]'),
-     111:('p_c1_load_end = [-132.738,140.167,38.001,184.021,-267.226,44.149]','p_c1_load_end = [-132.739,139.496,40.365,180.778,-267.228,44.091]')}
+to_movl(2644,'p_unload_daotool_wait','log_message(1,"P8C1 RETURN UNLOAD_DAOTOOL_WAIT START")','log_message(1,"P8C1 MOVEL RETURN UNLOAD_DAOTOOL_WAIT START")','speed_movel_fast',3500,0,'Straight 36.2 mm lift: MoveL (was MoveJ).')
+to_movl(2617,'p_unload_daotool','log_message(1,"P8C1 MOVEJ UNLOAD_DAOTOOL START")','log_message(1,"P8C1 MOVEL UNLOAD_DAOTOOL START")','speed_movel',200,0,'Straight 36.2 mm descent: MoveL (was MoveJ).')
+C1N={109:('p_c1_load = [-132.924,140.231,37.879,184.079,-267.412,44.142]','p_c1_load = [-133.226,140.148,39.140,181.366,-267.073,44.109]'),
+     110:('p_c1_load_wait = [-138.586,143.111,32.339,186.740,-273.070,43.926]','p_c1_load_wait = [-136.904,141.578,36.301,182.774,-270.750,44.067]'),
+     111:('p_c1_load_end = [-132.738,140.167,38.001,184.021,-267.226,44.149]','p_c1_load_end = [-132.915,140.059,39.318,181.277,-266.762,44.112]')}
 for n,(o,nw) in C1N.items():
     assert L[n-1].strip()==o,(n,L[n-1]); L[n-1]=nw
 assert L[107].startswith('# Updated taught positions for CNC1 Load.')
-L[107] = L[107] + ' - [CNC36] C1Load/C1LoadWait/C1LoadEnd re-taught 2026-11-17'
+L[107] = L[107] + ' - [CNC36] re-taught 2026-11-26 with TCP Load_Tron (round head)'
 assert L[118].startswith('# Process 2 Case 3 - Load CNC2')
-L[118] = L[118] + ' - [CNC36] LoadM2_Wait/LoadC2/EndLoadM2v1 re-taught 2026-11'
+L[118] = L[118] + ' - [CNC36] 2026-11-26: LoadM2_Wait/LoadC2/EndLoadM2v1 = SQUARE head set (TCP Load_vuong)'
 # sanity anchors (1-based original numbering)
 assert ln(71).startswith('p_c2_user_x_offset')
 assert ln(131).startswith('p_unload_m2 =')
@@ -148,7 +171,10 @@ def copy_of(name):
 off=['# [CNC36] CNC3..CNC6 fine offsets in the active User frame (same meaning as CNC1/CNC2).',
  'p_c3_user_x_offset = [0.0,0,0.0,0,0,0]','p_c4_user_x_offset = [0.0,0,0.0,0,0,0]',
  'p_c5_user_x_offset = [0.0,0,0.0,0,0,0]','p_c6_user_x_offset = [0.0,0,0.0,0,0,0]']
-pts=['','# ===== [CNC36] CNC3..CNC6 TAUGHT POINTS =====',
+pts=['','# ===== [CNC36] SPARE: CNC2 load points for the ROUND head (TCP Load_Tron), taught 2026-11-26 =====',
+ '# Not used now (CNC2 is loaded with the square head). Kept for a future product/model selection.',
+ 'p_c2_tron_load_wait = [51.981,126.155,66.601,166.126,-261.765,44.318]','p_c2_tron_load = [57.453,126.223,66.572,166.066,-256.294,44.208]','p_c2_tron_load_end = [57.814,126.257,66.520,166.082,-255.933,44.201]',
+ '# ===== [CNC36] CNC3..CNC6 TAUGHT POINTS =====',
  '# The robot base rides on Axis1 (moved by PLC): Pos1 = CNC1/2, Pos2 = CNC3/4, Pos3 = CNC5/6.',
  '# Joint points are relative to the robot base. If Axis1 stops at exactly the same relative',
  '# position in front of every pair, the CNC1/CNC2 values could be reused unchanged.',

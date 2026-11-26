@@ -401,3 +401,18 @@ Chuẩn bị: giữ `jamaguchi_cnc36.txt` trên bộ điều khiển (tên khác
   Chuyển động không ảnh hưởng (cặp kine_forward + movl). Các ngưỡng tọa độ cố định (zone_monitor, vùng nguy hiểm
   khi Home) đang so vị trí mặt bích với ngưỡng đo bằng tool_thanh → lệch khoảng chiều dài tool theo X.
   Đề xuất: đo lại X DoorC1, X DoorC2, Y Pick với **tool 0** trên màn hình Manual (giữ usrfr_thanh) để cập nhật ngưỡng.
+
+## 25. Bộ điểm 2026-11-26 – Tool Load chia đầu tròn / đầu vuông
+
+* TCP (bảng JAKA): Unload [-67.5,67.5,142,0,0,135]; Load_Tron [67.5,-67.5,139,0,0,-45]; Load_vuong [67.5,-67.5,145,0,0,-45]
+  (tròn/vuông chỉ khác 6 mm theo Z tool). Chung xi lanh DO60/DO61.
+* Phân công: P1 Pick + CNC1 Load (lẻ 1/3/5) = **Load tròn**; P8 đảo tool chuyển hàng sang **Load vuông**;
+  CNC2 Load (chẵn 2/4/6) = **Load vuông** (`p_load_m2_wait/p_load_c2/p_end_load_m2v1` = bộ *_sq); Unload như cũ.
+* Bộ CNC2 Load tròn giữ dự phòng: `p_c2_tron_load_wait/_load/_load_end` (sau này chọn model).
+* Không dùng `set_tool_id` trong code: điểm theo góc khớp + cặp kine_forward/movl ⇒ về đúng tư thế với mọi TCP;
+  mọi đoạn MoveL đã kiểm (từ tọa độ Descartes) là tịnh tiến thuần (xoay ≤ 0,37°) ⇒ quỹ đạo như nhau với mọi TCP.
+* Cập nhật: pickwait, pick, C1Unload/Wait (**Down = Unload**, MoveL 0 mm), c1load/wait/end, unload_daotool,
+  load_daotool/wait (Load_vuong, xuống 62,4 mm), c2_unload/wait. Giữ: Door, Air C1/C2, TG, Home (bản teach mới
+  Home_J = [-45,56.711,106.885,194.140,-264.961,-45] chưa áp dụng – J6 xoay 93,7°).
+* P8: unload_daotool xuống, lùi lên unload_daotool_wait, lùi lên load_daotool_wait → **MoveL** (trước là MoveJ).
+  Vùng nhận diện Home của 2 đoạn đảo tool tính lại (±5°).
